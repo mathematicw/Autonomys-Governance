@@ -171,3 +171,7 @@ or
 
 
 End of description.
+
+
+**Wallet**
+To execute blockchain transactions, the bot's wallet needs to be funded.
