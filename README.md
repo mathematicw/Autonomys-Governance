@@ -52,13 +52,11 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
 `/vote <subject>`		- creates a thread with name in format: "V:YYYY-MM-DD: [subject]",
         where `YYYY-MM-DD` is the expiration date, when the thread will be self-locked, this is managed by variable VOTING_DURATION in `.env` file.
-:::note
-For testing purposes it could be set to 1 hour.
-:::
+> ⚠️ **Note:** For testing purposes it could be set to 1 hour.
         The [subject] is to be entered manually by user.
 
-#Note: users will not be able to change voting thread name - to prevent this the bot will roll-back the thread's name every time, when a user tries to rename it.
-#Note: The bot will control tries to re-activate expired threads, and lock them back immediately.
+> ⚠️ **Note:** users will not be able to change voting thread name - to prevent this the bot will roll-back the thread's name every time, when a user tries to rename it.
+> ⚠️ **Note:** The bot will control tries to re-activate expired threads, and lock them back immediately.
 
 `/myVoteToken`		- bot gets threadID from thread, where the command is ran, and returns VoteToken generated from user's userID, thread's threadID and secret from `.env` file to the user in ephemeral message.
 
@@ -97,7 +95,7 @@ If a user use the command ```/vote <subject>```, the bot:
   - casts another message (call it Progress message) with:
 	- message or GUI with voting progress under spoiler: "Voting progress: ||<FOR:_> <AGAINST:_> <ABSTAIN:_>|| Warning: Avoid opening the spoiler, make your decision unbiased!".
 	- list Voting tokens issued for all eligible users.
-#Note: the bot generates a hash based on userID, threadID and a secret. This is a 8 symbols string. This function returns constant within one threadID and for one userID. So VoteToken is always the same for the same user and thread.
+> ⚠️ **Note:** the bot generates a hash based on userID, threadID and a secret. This is a 8 symbols string. This function returns constant within one threadID and for one userID. So VoteToken is always the same for the same user and thread.
 
 
 **User Interaction With the Voting Buttons**
@@ -115,9 +113,9 @@ When bot accepts vote it:
 	- adjust vote counter, in accordance with the vote cast. (For ex. if recent user have cast FOR - bot should adjust the "FOR" section of the counter by 1). 
 	- when last voter casts vote, the bot returns normal message (not ephemeral) into chat: "Voting successfully completed. The results have been saved to the blockchain. To view, use the command `/results <threadID>`.", locks the thread, send bc transaction.
 
-#Note: to prevent repeated voting the bot accepts votes only from those users, whose VoteTokens are listed in the 'Progress message' in the thread.
-#Note: After each new vote the counter should be adjusted and so that the number of votes is always displayed in the thread, making this no problem, if bot goes offline without any local databases. When bot come up again - it just read all data from the thread.
-#Note: Bot doesn't send a bc transaction every time someone votes. Only the completed voting process results are to be sent to the blockchain once all participants have voted, or at the moment of the thread expiration.
+> ⚠️ **Note:** to prevent repeated voting the bot accepts votes only from those users, whose VoteTokens are listed in the 'Progress message' in the thread.
+> ⚠️ **Note:** After each new vote the counter should be adjusted and so that the number of votes is always displayed in the thread, making this no problem, if bot goes offline without any local databases. When bot come up again - it just read all data from the thread.
+> ⚠️ **Note:** Bot doesn't send a bc transaction every time someone votes. Only the completed voting process results are to be sent to the blockchain once all participants have voted, or at the moment of the thread expiration.
 
 **Timers**
 
