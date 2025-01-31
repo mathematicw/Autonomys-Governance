@@ -55,7 +55,9 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
         The [subject] is to be entered manually by user.
 > **Note:** 
 > For testing purposes it could be set to 1 hour.
+
 > Users will not be able to change voting thread name - to prevent this the bot will roll-back the thread's name every time, when a user tries to rename it.
+
 > The bot will control tries to re-activate expired threads, and lock them back immediately.
 
 `/myVoteToken`		- bot gets threadID from thread, where the command is ran, and returns VoteToken generated from user's userID, thread's threadID and secret from `.env` file to the user in ephemeral message.
@@ -116,7 +118,9 @@ When bot accepts vote it:
 
 > **Note:**
 > To prevent repeated voting the bot accepts votes only from those users, whose VoteTokens are listed in the 'Progress message' in the thread.
+
 > After each new vote the counter should be adjusted and so that the number of votes is always displayed in the thread, making this no problem, if bot goes offline without any local databases. When bot come up again - it just read all data from the thread.
+
 > Bot doesn't send a bc transaction every time someone votes. Only the completed voting process results are to be sent to the blockchain once all participants have voted, or at the moment of the thread expiration.
 
 **Timers**
