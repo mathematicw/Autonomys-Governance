@@ -1,0 +1,21 @@
+sudo apt install node.js
+wget https://nodejs.org/dist/v22.12.0/node-v22.12.0-linux-x64.tar.xz
+tar -xf node*.xz
+
+sudo npm install -g pm2
+mkdir vote-bot
+cd vote-bot
+npm init -y
+npm install discord.js dotenv dayjs @autonomys/auto-utils @autonomys/auto-consensus @autonomys/auto-drive @types/node typescript ts-node fs ethers @polkadot/util-crypto @polkadot/util
+
+**Build** (already built)
+npm run build
+
+**Run**
+node dist/bot.js
+
+or
+
+pm2 start bot.js --name "governance-bot"
+pm2 save
+sudo env PATH=$PATH:/usr/bin /usr/local/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
