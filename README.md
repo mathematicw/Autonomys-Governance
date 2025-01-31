@@ -112,6 +112,7 @@ When bot accepts vote it:
 	- erases their VoteToken from the 'Progress message' (because this VoteToken can not be used again, preventing repeated voting);
 	- adjust vote counter, in accordance with the vote cast. (For ex. if recent user have cast FOR - bot should adjust the "FOR" section of the counter by 1). 
 	- when last voter casts vote, the bot returns normal message (not ephemeral) into chat: "Voting successfully completed. The results have been saved to the blockchain. To view, use the command `/results <threadID>`.", locks the thread, send bc transaction.
+
 #Note: to prevent repeated voting the bot accepts votes only from those users, whose VoteTokens are listed in the 'Progress message' in the thread.
 #Note: After each new vote the counter should be adjusted and so that the number of votes is always displayed in the thread, making this no problem, if bot goes offline without any local databases. When bot come up again - it just read all data from the thread.
 #Note: Bot doesn't send a bc transaction every time someone votes. Only the completed voting process results are to be sent to the blockchain once all participants have voted, or at the moment of the thread expiration.
