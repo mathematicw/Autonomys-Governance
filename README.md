@@ -44,13 +44,13 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
 **Bot's Slash Commands**:
 
-/discussion <subject>	- creates a Discussion thread with name in format: "D:[subject]".
+`/discussion <subject>`	- creates a Discussion thread with name in format: "D:[subject]".
 
-/proposal <subject>	- creates a Proposal thread with name in format: "P:YYYY-MM-DD: [subject]",
+`/proposal <subject>`	- creates a Proposal thread with name in format: "P:YYYY-MM-DD: [subject]",
         where `YYYY-MM-DD` is the expiration date, when the thread will be self-locked, 7 days from the creation date, by default.
         The [subject] is to be entered manually by user.
 
-/vote <subject>		- creates a thread with name in format: "V:YYYY-MM-DD: [subject]",
+`/vote <subject>`		- creates a thread with name in format: "V:YYYY-MM-DD: [subject]",
         where `YYYY-MM-DD` is the expiration date, when the thread will be self-locked, this is managed by variable VOTING_DURATION in `.env` file.
 #Note: For testing purposes it could be set to 1 hour.
         The [subject] is to be entered manually by user.
@@ -58,15 +58,15 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 #Note: users will not be able to change voting thread name - to prevent this the bot will roll-back the thread's name every time, when a user tries to rename it.
 #Note: The bot will control tries to re-activate expired threads, and lock them back immediately.
 
-/myVoteToken		- bot gets threadID from thread, where the command is ran, and returns VoteToken generated from user's userID, thread's threadID and secret from `.env` file to the user in ephemeral message.
+`/myVoteToken`		- bot gets threadID from thread, where the command is ran, and returns VoteToken generated from user's userID, thread's threadID and secret from `.env` file to the user in ephemeral message.
 
-/results <threadName> (where threadName is the full name of the thread)
+`/results <threadName>` (where threadName is the full name of the thread)
  or
-/results <threadID>	- retrieves voting data, related to provided name (or ID) of voting thread, from blockchain
+`/results <threadID>`	- retrieves voting data, related to provided name (or ID) of voting thread, from blockchain
 
-/help			- shows this commands tutorial (briefly).
+`/help`			- shows this commands tutorial (briefly).
 
-"/" 			- shows commands.
+`/` 			- shows commands.
 
 
 **Variables**
@@ -147,9 +147,9 @@ When bot needs to send bc transaction , the following data will be included to i
 **Retrieving Voting Results**
 
 The commands:
-/results <threadName>
+`/results <threadName>`
 or
-/results <threadID> should return the following information right into the thread, where the command is ran:
+`/results <threadID>` should return the following information right into the thread, where the command is ran:
 
 	- "Voting threadID:"			// ID of the thread
 	- "Date of creating the thread:"	// date of thread creating in UTC format
