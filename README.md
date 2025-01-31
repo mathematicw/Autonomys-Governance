@@ -140,7 +140,7 @@ When bot needs to send bc transaction , the following data will be included to i
 	- "Full name of the thread:"		// full thread name
 	- "Total role members:"			// get number of all members of the role, specified in `.env` file at that moment
 	- "Participants (userID):" 		// get all members of the role, specified in `.env` file at that moment
-	- "Voting results:" 			// [FOR] , [AGAINST] , [ABSTAIN] values from voting counter without spoiler
+	- "Voting results:" 			// [FOR] , [AGAINST] , [ABSTAIN] values from voting counter
 	- "Voting tokens left:"			// list of VoteTokens which were not used
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No".
 
@@ -157,7 +157,7 @@ or
 	- "Full name of the thread:"		// full thread name
 	- "Total role members:"			// get number of all members of the role, specified in `.env` file at that moment
 	- "Participants (userID):" 		// get all members of the role, specified in `.env` file at that moment
-	- "Voting results:" 			// [FOR], [AGAINST], [ABSTAIN] values from voting counter explicitly (without spoiler)
+	- "Voting results:" 			// [FOR], [AGAINST], [ABSTAIN] values from voting counter
 	- "Voting tokens left:"			// list of VoteTokens which were not used
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No"
 
