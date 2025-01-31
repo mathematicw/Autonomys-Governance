@@ -52,7 +52,9 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
 `/vote <subject>`		- creates a thread with name in format: "V:YYYY-MM-DD: [subject]",
         where `YYYY-MM-DD` is the expiration date, when the thread will be self-locked, this is managed by variable VOTING_DURATION in `.env` file.
-#Note: For testing purposes it could be set to 1 hour.
+:::note
+For testing purposes it could be set to 1 hour.
+:::
         The [subject] is to be entered manually by user.
 
 #Note: users will not be able to change voting thread name - to prevent this the bot will roll-back the thread's name every time, when a user tries to rename it.
