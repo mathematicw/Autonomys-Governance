@@ -76,6 +76,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
  - DISCORD_TOKEN=...		// Discord Token should be obtained at discord dev portal
  - SUBSTRATE_ENDPOINT=...	// it is "wss://rpc.taurus.subspace.foundation/ws" currently
+ - EVM_ENDPOINT=...		//
  - SEED_PHRASE=...		// fund this
  - ROLE_ID=...			// the Discord ID of the role corresponding to the team for which the voting is being conducted
  - VOTERID_SECRET=...  		// this secret is a constant, used for calculating Vote Tokens for each participant
