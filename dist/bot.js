@@ -1,14 +1,14 @@
 "use strict";
-// bot.ts
+// src/bot.ts
 // Main Discord bot logic
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const discord_js_1 = require("discord.js");
 const blockchain_1 = require("./blockchain");
 const utils_1 = require("./utils");
-// .env
+// Environment variables from .env
 const { DISCORD_TOKEN, SUBSTRATE_ENDPOINT, SEED_PHRASE, ROLE_ID, VOTERID_SECRET, VOTING_DURATION } = process.env;
-// parse duration (in hours), default 168
+// Parse voting duration in hours; default is 168 (7 days)
 const VOTING_DURATION_HOURS = parseInt(VOTING_DURATION || '168', 10);
 const BOT_TOKEN = DISCORD_TOKEN || '';
 let offlineSince = null;
@@ -21,6 +21,7 @@ const client = new discord_js_1.Client({
     ],
     partials: [discord_js_1.Partials.Message, discord_js_1.Partials.Channel, discord_js_1.Partials.Reaction]
 });
+// Define slash commands (all replies and logs in English)
 const commands = [
     new discord_js_1.SlashCommandBuilder()
         .setName('discussion')
@@ -28,18 +29,18 @@ const commands = [
         .addStringOption((opt) => opt.setName('subject').setDescription('Subject').setRequired(true)),
     new discord_js_1.SlashCommandBuilder()
         .setName('proposal')
-        .setDescription('Create a Proposal thread (time-limited by VOTING_DURATION).')
+        .setDescription('Create a Proposal thread (time-limited by VOTING_DURATION)')
         .addStringOption((opt) => opt.setName('subject').setDescription('Subject').setRequired(true)),
     new discord_js_1.SlashCommandBuilder()
         .setName('vote')
-        .setDescription('Create a Voting thread (time-limited by VOTING_DURATION).')
+        .setDescription('Create a Voting thread (time-limited by VOTING_DURATION)')
         .addStringOption((opt) => opt.setName('subject').setDescription('Subject').setRequired(true)),
     new discord_js_1.SlashCommandBuilder()
         .setName('myvotetoken')
         .setDescription('Get your VoteToken'),
     new discord_js_1.SlashCommandBuilder()
         .setName('results')
-        .setDescription('Retrieve voting results')
+        .setDescription('Retrieve voting results (only for finished threads)')
         .addStringOption((opt) => opt.setName('threadref').setDescription('Thread name or ID').setRequired(true)),
     new discord_js_1.SlashCommandBuilder()
         .setName('help')
@@ -56,7 +57,7 @@ async function registerCommands(guildId) {
         await rest.put(discord_js_1.Routes.applicationGuildCommands(client.user?.id || '', guildId), { body: commands });
     }
 }
-// On process exit, store offline time
+// On process exit, store offline timestamp.
 process.on('beforeExit', () => (0, utils_1.storeOfflineTimestamp)());
 process.on('SIGINT', () => {
     (0, utils_1.storeOfflineTimestamp)();
@@ -64,25 +65,22 @@ process.on('SIGINT', () => {
 });
 client.once('ready', async () => {
     console.log(`Bot started as ${client.user?.tag}`);
-    // read offline timestamp from file
+    // Read offline timestamp from file.
     offlineSince = (0, utils_1.readOfflineTimestamp)();
     await registerCommands();
     await (0, blockchain_1.initChain)(SUBSTRATE_ENDPOINT || '', SEED_PHRASE || '');
-    // If you do NOT want background checks, comment out these lines:
-    setInterval(() => {
-        checkActiveThreads().catch((err) => {
-            console.error('Error in checkActiveThreads:', err);
-        });
-    }, 5 * 60 * 1000);
+    // For this task, check active threads only once on startup.
     await checkActiveThreads();
 });
 /**
- * Periodically check for expired threads, lock them, store final results if not already stored.
+ * Check for expired threads in all guilds.
+ * For each thread with prefix "P:" or "V:" that is not already locked/archived and not finalized,
+ * if the thread has expired (i.e. thread.createdAt + VOTING_DURATION_HOURS < now),
+ * then lock it, send a message, and store final results on-chain.
  */
 async function checkActiveThreads() {
     const guilds = client.guilds.cache;
-    for (const [gId] of guilds) {
-        const guild = client.guilds.cache.get(gId);
+    for (const [_, guild] of guilds) {
         if (!guild)
             continue;
         await guild.members.fetch();
@@ -94,25 +92,21 @@ async function checkActiveThreads() {
                 const textCh = chData;
                 const activeThreads = await textCh.threads.fetchActive();
                 activeThreads.threads.forEach(async (thread) => {
-                    // we only process if it's a "P:" or "V:" thread
-                    if (!thread.name.startsWith('P:') && !thread.name.startsWith('V:')) {
+                    // Process only threads with prefix "P:" or "V:"
+                    if (!thread.name.startsWith('P:') && !thread.name.startsWith('V:'))
                         return;
-                    }
-                    if ((0, utils_1.isThreadFinalized)(thread.id)) {
-                        // we've already done final results for this thread
+                    // If thread is already locked/archived or already finalized, skip.
+                    if (thread.locked || thread.archived || (0, utils_1.isThreadFinalized)(thread.id))
                         return;
-                    }
-                    if ((0, utils_1.isExpired)(thread.name)) {
-                        // lock
+                    // Check expiration using thread.createdAt plus duration.
+                    if ((0, utils_1.isExpiredThread)(thread, VOTING_DURATION_HOURS)) {
                         await (0, utils_1.lockThread)(thread);
-                        // mention offline time
                         const nowStr = new Date().toISOString();
-                        let msg = `The bot noticed this thread is expired. Locking it now.`;
+                        let msg = `The thread has expired. Locking it now.`;
                         if (offlineSince) {
                             msg = `The bot was offline from ${offlineSince} to ${nowStr} and missed the deadline. Locking this thread.`;
                         }
                         await thread.send(msg);
-                        // store final results on chain
                         try {
                             const guildMembers = getRoleMembers(guild);
                             const allEligible = guildMembers.map((m) => `${m.user.tag} (${m.id})`);
@@ -132,7 +126,6 @@ async function checkActiveThreads() {
                             console.error('Error storing final results on chain:', err);
                             await thread.send(`Could not store final results on chain: ${err}`);
                         }
-                        // mark finalized
                         (0, utils_1.markThreadFinalized)(thread.id);
                     }
                 });
@@ -150,51 +143,39 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
     if (commandName === 'discussion') {
+        // Create a Discussion thread (no expiration check).
         const subject = interaction.options.getString('subject', true);
         const name = `D:${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({
-                content: 'Error while creating thread.',
-                ephemeral: true
-            });
+            await interaction.reply({ content: 'Error while creating thread.', ephemeral: true });
             return;
         }
-        await interaction.reply({
-            content: `Discussion thread created: ${thr.name}`,
-            ephemeral: true
-        });
+        await interaction.reply({ content: `Discussion thread created: ${thr.name}`, ephemeral: true });
     }
     if (commandName === 'proposal') {
+        // Create a Proposal thread with prefix "P:" and expiration date (YYYY-MM-DD).
         await guild.members.fetch();
         const subject = interaction.options.getString('subject', true);
         const expStr = (0, utils_1.formatExpirationDate)(new Date(), VOTING_DURATION_HOURS);
         const name = `P:${expStr}: ${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({
-                content: 'Error while creating proposal thread.',
-                ephemeral: true
-            });
+            await interaction.reply({ content: 'Error while creating proposal thread.', ephemeral: true });
             return;
         }
         await thr.send(`Ping: <@&${ROLE_ID}>`);
-        await interaction.reply({
-            content: `Proposal thread created: ${thr.name}`,
-            ephemeral: true
-        });
+        await interaction.reply({ content: `Proposal thread created: ${thr.name}`, ephemeral: true });
     }
     if (commandName === 'vote') {
+        // Create a Voting thread with prefix "V:" and expiration date (YYYY-MM-DD).
         await guild.members.fetch();
         const subject = interaction.options.getString('subject', true);
         const expStr = (0, utils_1.formatExpirationDate)(new Date(), VOTING_DURATION_HOURS);
         const name = `V:${expStr}: ${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({
-                content: 'Error while creating voting thread.',
-                ephemeral: true
-            });
+            await interaction.reply({ content: 'Error while creating voting thread.', ephemeral: true });
             return;
         }
         const row = new discord_js_1.ActionRowBuilder().addComponents(new discord_js_1.ButtonBuilder()
@@ -217,22 +198,16 @@ client.on('interactionCreate', async (interaction) => {
             content: `ThreadID: ${thr.id}\n<@&${ROLE_ID}>`,
             components: [row]
         });
-        // The progress in the thread under spoiler:
+        // Post initial progress message under spoiler.
         const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\n` +
             `Voting tokens left: ${tokens.join(', ')}`;
         await thr.send(content2);
-        await interaction.reply({
-            content: `Voting thread created: ${thr.name}`,
-            ephemeral: true
-        });
+        await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
     }
     if (commandName === 'myvotetoken') {
         const thr = interaction.channel;
         if (!thr || thr.type !== discord_js_1.ChannelType.PublicThread) {
-            await interaction.reply({
-                content: 'This command only works in a thread.',
-                ephemeral: true
-            });
+            await interaction.reply({ content: 'This command only works in a thread.', ephemeral: true });
             return;
         }
         const vt = (0, utils_1.generateVoteToken)(interaction.user.id, thr.id, VOTERID_SECRET || '');
@@ -245,7 +220,11 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: 'Thread not found.', ephemeral: true });
             return;
         }
-        const expired = (0, utils_1.isExpired)(thr.name);
+        // Only show results for finished (locked) threads.
+        if (!thr.locked) {
+            await interaction.reply({ content: 'Voting is still in progress! Results will be available after it ends!', ephemeral: true });
+            return;
+        }
         const createdAt = (thr.createdAt ?? new Date()).toISOString();
         const mems = getRoleMembers(guild);
         const allEligible = mems.map((m) => `${m.user.tag} (${m.id})`);
@@ -255,9 +234,7 @@ client.on('interactionCreate', async (interaction) => {
             const lines = pm.content.split('\n');
             for (const line of lines) {
                 if (line.startsWith('Voting progress:')) {
-                    // e.g. "Voting progress: ||FOR: 1 | AGAINST: 2 | ABSTAIN: 1||"
                     const raw = line.replace('Voting progress:', '').replace(/\|/g, '').trim();
-                    // raw might be "FOR: 1  AGAINST: 2  ABSTAIN: 1"
                     const parts = raw.split('  ');
                     if (parts.length >= 3) {
                         forCount = parseInt(parts[0].replace('FOR:', '').trim()) || 0;
@@ -267,19 +244,19 @@ client.on('interactionCreate', async (interaction) => {
                 }
                 else if (line.startsWith('Voting tokens left:')) {
                     const leftover = line.replace('Voting tokens left:', '').trim();
-                    tokensLeft = leftover
-                        .split(',')
-                        .map((x) => x.trim())
-                        .filter((x) => x);
+                    tokensLeft = leftover.split(',').map(x => x.trim()).filter(x => x);
                 }
             }
         }
         const totalVotes = forCount + againstCount + abstainCount;
+        const expired = (0, utils_1.isExpiredThread)(thr, VOTING_DURATION_HOURS);
         const finished = (0, utils_1.isVotingFinished)(totalVotes, mems.size, expired);
+        // Build results message including extra lines.
         const msg = `ID: ${thr.id}\n` +
             `Created at: ${createdAt}\n` +
             `Thread name: ${thr.name}\n` +
             `Total participants: ${mems.size}\n` +
+            `Participants voted: ${totalVotes}\n` +
             `Participants: ${allEligible.join(', ')}\n` +
             `FOR: ${forCount} | AGAINST: ${againstCount} | ABSTAIN: ${abstainCount}\n` +
             `Deadline missed: ${expired ? 'Yes' : 'No'}\n` +
@@ -289,43 +266,37 @@ client.on('interactionCreate', async (interaction) => {
     }
     if (commandName === 'help') {
         const msg = `Commands:
-    /discussion <subject>
-    /proposal <subject>
-    /vote <subject>
-    /myVoteToken
-    /results <threadName|threadID>
-    /help`;
+/discussion <subject>
+/proposal <subject>
+/vote <subject>
+/myVoteToken
+/results <threadName|threadID>
+/help`;
         await interaction.reply({ content: msg, ephemeral: true });
     }
 });
-// Button clicks
+// Button interactions: handle vote button clicks.
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton())
         return;
     const buttonInteraction = interaction;
     const { customId } = buttonInteraction;
     const thread = buttonInteraction.channel;
-    // if the thread is not a public thread, ignore
     if (!thread || thread.type !== discord_js_1.ChannelType.PublicThread)
         return;
-    // if thread is locked or archived, do nothing
     if (thread.locked || thread.archived)
         return;
-    // if expired => lock, do nothing else
-    if ((0, utils_1.isExpired)(thread.name)) {
+    // If the thread is expired based on creation time, lock it and do nothing.
+    if ((0, utils_1.isExpiredThread)(thread, VOTING_DURATION_HOURS)) {
         await (0, utils_1.lockThread)(thread);
         return;
     }
     const pm = await findProgressMessage(thread);
     if (!pm) {
-        // no progress message => can't update
-        await buttonInteraction.reply({
-            content: 'No voting data found.',
-            ephemeral: true
-        });
+        await buttonInteraction.reply({ content: 'No voting data found in this thread.', ephemeral: true });
         return;
     }
-    // parse existing
+    // Parse current voting counts and tokens left from the progress message.
     let forCount = 0, againstCount = 0, abstainCount = 0;
     let tokensLeft = [];
     {
@@ -333,7 +304,6 @@ client.on('interactionCreate', async (interaction) => {
         for (const line of lines) {
             if (line.startsWith('Voting progress:')) {
                 const raw = line.replace('Voting progress:', '').trim().replace(/\|/g, '');
-                // e.g. "||FOR: 1  AGAINST: 2  ABSTAIN: 0||" -> "FOR: 1  AGAINST: 2  ABSTAIN: 0"
                 const parts = raw.split('  ');
                 if (parts.length >= 3) {
                     forCount = parseInt(parts[0].replace('FOR:', '').trim()) || 0;
@@ -343,19 +313,13 @@ client.on('interactionCreate', async (interaction) => {
             }
             else if (line.startsWith('Voting tokens left:')) {
                 const leftover = line.replace('Voting tokens left:', '').trim();
-                tokensLeft = leftover
-                    .split(',')
-                    .map((x) => x.trim())
-                    .filter((x) => x);
+                tokensLeft = leftover.split(',').map(x => x.trim()).filter(x => x);
             }
         }
     }
     const token = (0, utils_1.generateVoteToken)(buttonInteraction.user.id, thread.id, VOTERID_SECRET || '');
     if (!tokensLeft.includes(token)) {
-        await buttonInteraction.reply({
-            content: 'You are either not eligible or already used your token!',
-            ephemeral: true
-        });
+        await buttonInteraction.reply({ content: 'You are either not eligible or have already used your token!', ephemeral: true });
         return;
     }
     if (customId === 'vote_for')
@@ -364,28 +328,26 @@ client.on('interactionCreate', async (interaction) => {
         againstCount++;
     if (customId === 'vote_abstain')
         abstainCount++;
-    // remove token
-    const newLeft = tokensLeft.filter((t) => t !== token);
-    // check if finished
+    const newLeft = tokensLeft.filter(t => t !== token);
     const guild = buttonInteraction.guild;
     let totalMems = 0;
     if (guild) {
         totalMems = getRoleMembers(guild).size;
     }
     const totalVotes = forCount + againstCount + abstainCount;
-    const expired = (0, utils_1.isExpired)(thread.name);
-    const finished = (0, utils_1.isVotingFinished)(totalVotes, totalMems, expired);
+    const finished = (0, utils_1.isVotingFinished)(totalVotes, totalMems, false);
     const newContent = `Voting progress: ||FOR: ${forCount} | AGAINST: ${againstCount} | ABSTAIN: ${abstainCount}||\n` +
         `Voting tokens left: ${newLeft.join(', ')}`;
     await pm.edit({ content: newContent });
     if (finished) {
-        // store final results, lock thread
+        // First, send an ephemeral reply to the last voter confirming the vote.
+        await buttonInteraction.reply({ content: `Your vote is recorded. This was the final vote.`, ephemeral: true });
+        // Then, store final results on-chain if not already done.
         if (!(0, utils_1.isThreadFinalized)(thread.id)) {
-            // do on-chain
             try {
                 if (guild) {
                     const mems = getRoleMembers(guild);
-                    const allEligible = mems.map((m) => `${m.user.tag} (${m.id})`);
+                    const allEligible = mems.map(m => `${m.user.tag} (${m.id})`);
                     const payload = {
                         votingThreadId: thread.id,
                         dateOfCreating: (thread.createdAt ?? new Date()).toISOString(),
@@ -393,7 +355,7 @@ client.on('interactionCreate', async (interaction) => {
                         eligibleCount: mems.size,
                         allEligibleMembers: allEligible,
                         votes: `FOR: ${forCount}, AGAINST: ${againstCount}, ABSTAIN: ${abstainCount}`,
-                        missedDeadline: expired,
+                        missedDeadline: false,
                         votingFinished: true
                     };
                     await (0, blockchain_1.storeVotingResultsOnChain)(payload);
@@ -405,23 +367,19 @@ client.on('interactionCreate', async (interaction) => {
             }
             (0, utils_1.markThreadFinalized)(thread.id);
         }
-        // normal message (not ephemeral)
+        // Post a normal message in the thread announcing completion.
         await thread.send('Voting is complete. The results have been saved on chain. Use `/results <threadID>` to see details.');
+        // Finally, lock the thread.
         await (0, utils_1.lockThread)(thread);
-        // don't send ephemeral here, or it might fail if locked
         return;
     }
     else {
-        // not finished => ephemeral
-        await buttonInteraction.reply({
-            content: `Your vote is recorded. Token: ${token}`,
-            ephemeral: true
-        });
+        // If voting is not finished, send an ephemeral reply.
+        await buttonInteraction.reply({ content: `Your vote is recorded. Token: ${token}`, ephemeral: true });
     }
 });
-// handle rename or unarchive
+// Handle thread updates: revert unauthorized renames or unarchiving of expired threads.
 client.on('threadUpdate', async (oldThread, newThread) => {
-    // revert rename if it's a voting thread
     if (oldThread.name.startsWith('V:') && !newThread.name.startsWith('V:')) {
         try {
             await newThread.setName(oldThread.name);
@@ -429,14 +387,17 @@ client.on('threadUpdate', async (oldThread, newThread) => {
         catch { }
     }
     if (oldThread.archived && !newThread.archived) {
-        // if user tries to unarchive expired thread => lock again
-        if (newThread.name.startsWith('V:') && (0, utils_1.isExpired)(newThread.name)) {
+        if (newThread.name.startsWith('V:') && (0, utils_1.isExpiredThread)(newThread, VOTING_DURATION_HOURS)) {
             await (0, utils_1.lockThread)(newThread);
         }
     }
 });
 /**
- * createThread
+ * createThread - Create a new thread in the channel.
+ *
+ * @param interaction - The chat input command interaction.
+ * @param name - The desired thread name.
+ * @returns The created ThreadChannel or null.
  */
 async function createThread(interaction, name) {
     const channel = interaction.channel;
@@ -444,11 +405,15 @@ async function createThread(interaction, name) {
         return null;
     return channel.threads.create({
         name,
-        autoArchiveDuration: 1440 // 1 day
+        autoArchiveDuration: 1440 // 1 day (in minutes)
     });
 }
 /**
- * findThreadByRef
+ * findThreadByRef - Find a thread by its name or ID.
+ *
+ * @param interaction - The command interaction.
+ * @param ref - The thread name or ID.
+ * @returns The found ThreadChannel or null.
  */
 async function findThreadByRef(interaction, ref) {
     const ch = interaction.channel;
@@ -457,13 +422,13 @@ async function findThreadByRef(interaction, ref) {
     const textCh = ch;
     const active = await textCh.threads.fetchActive();
     let found = null;
-    active.threads.forEach((t) => {
+    active.threads.forEach(t => {
         if (t.id === ref || t.name === ref)
             found = t;
     });
     if (!found) {
         const archived = await textCh.threads.fetchArchived();
-        archived.threads.forEach((t) => {
+        archived.threads.forEach(t => {
             if (t.id === ref || t.name === ref)
                 found = t;
         });
@@ -471,14 +436,20 @@ async function findThreadByRef(interaction, ref) {
     return found;
 }
 /**
- * findProgressMessage
+ * findProgressMessage - Find the bot's progress message in a thread.
+ *
+ * @param thread - The Discord thread channel.
+ * @returns The progress Message or null if not found.
  */
 async function findProgressMessage(thread) {
     const msgs = await thread.messages.fetch({ limit: 50 });
-    return msgs.find((m) => m.content.includes('Voting progress:') && m.author.id === client.user?.id) || null;
+    return msgs.find(m => m.content.includes('Voting progress:') && m.author.id === client.user?.id) || null;
 }
 /**
- * getRoleMembers
+ * getRoleMembers - Return the collection of guild members that have the role specified by ROLE_ID.
+ *
+ * @param guild - The Discord guild.
+ * @returns A Collection of GuildMember.
  */
 function getRoleMembers(guild) {
     const role = guild.roles.cache.get(ROLE_ID || '');

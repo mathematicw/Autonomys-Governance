@@ -1,18 +1,24 @@
-// utils.ts
-// Common logic: generating tokens, checking expiry, storing offline time, etc.
+// src/utils.ts
+// Common logic: token generation, expiration checking, offline timestamp storage,
+// and thread finalization tracking.
 
+// Import required modules.
 import fs from 'fs';
 import dayjs from 'dayjs';
 import { ThreadChannel } from 'discord.js';
 
 const OFFLINE_FILE = 'offline.json';
 
-// Track which threads we have already submitted final results for
-// so we don't spam the chain multiple times for the same thread.
+// A Set to track threads for which final results have been submitted.
 const finalizedThreads = new Set<string>();
 
 /**
- * Generate a short VoteToken from userId, threadId, and a secret.
+ * Generate a short VoteToken based on userId, threadId, and a secret.
+ *
+ * @param userId - The Discord user ID.
+ * @param threadId - The Discord thread ID.
+ * @param secret - The secret string (from .env VOTERID_SECRET).
+ * @returns A short alphanumeric token.
  */
 export function generateVoteToken(
   userId: string,
@@ -31,30 +37,39 @@ export function generateVoteToken(
 }
 
 /**
- * Format an expiration date/time as "YYYY-MM-DD_HH-mm"
+ * Format an expiration date as "YYYY-MM-DD".
+ * This is used to construct the thread name.
+ *
+ * @param date - The current date.
+ * @param hoursToAdd - The voting duration in hours.
+ * @returns A string in the format "YYYY-MM-DD".
  */
 export function formatExpirationDate(date: Date, hoursToAdd: number): string {
-  return dayjs(date).add(hoursToAdd, 'hour').format('YYYY-MM-DD_HH-mm');
+  return dayjs(date).add(hoursToAdd, 'hour').format('YYYY-MM-DD');
 }
 
 /**
- * Check if a thread name starts with e.g. "V:2025-02-01_15-30"
- * and parse the date/time to see if now is after that time.
+ * Check if a thread has expired.
+ * Instead of parsing the date from the thread name, we use the thread's creation time.
+ *
+ * @param thread - The Discord thread channel.
+ * @param votingDurationHours - The voting duration in hours (from .env).
+ * @returns True if the current time is after (thread.createdAt + votingDurationHours).
  */
-export function isExpired(threadName: string): boolean {
-  // e.g. "V:2025-02-01_15-30: subject"
-  // so parts[1] = "2025-02-01_15-30"
-  const parts = threadName.split(':');
-  if (parts.length < 2) return false;
-  const dt = parts[1].trim();
-  const maybe = dayjs(dt, 'YYYY-MM-DD_HH-mm');
-  if (!maybe.isValid()) return false;
-  return dayjs().isAfter(maybe);
+export function isExpiredThread(thread: ThreadChannel, votingDurationHours: number): boolean {
+  const creationTime = dayjs(thread.createdAt);
+  const expirationTime = creationTime.add(votingDurationHours, 'hour');
+  return dayjs().isAfter(expirationTime);
 }
 
 /**
- * We consider the voting "finished" if votesCount >= totalParticipants
- * or if time is expired.
+ * Determine if voting is finished.
+ * Voting is finished if total votes are at least equal to total participants or time has expired.
+ *
+ * @param votesCount - Total number of votes recorded.
+ * @param totalParticipants - Total number of eligible participants.
+ * @param timeExpired - Boolean indicating if the voting duration has expired.
+ * @returns True if voting is finished.
  */
 export function isVotingFinished(
   votesCount: number,
@@ -67,33 +82,40 @@ export function isVotingFinished(
 }
 
 /**
- * Mark a thread as "finalized" so we won't do repeated on-chain submissions.
+ * Mark a thread as finalized to prevent duplicate on-chain submissions.
+ *
+ * @param threadId - The ID of the thread.
  */
 export function markThreadFinalized(threadId: string) {
   finalizedThreads.add(threadId);
 }
 
 /**
- * Check if a thread is already "finalized".
+ * Check if a thread has already been finalized.
+ *
+ * @param threadId - The ID of the thread.
+ * @returns True if the thread is marked as finalized.
  */
 export function isThreadFinalized(threadId: string): boolean {
   return finalizedThreads.has(threadId);
 }
 
 /**
- * Lock a thread (archive + locked).
+ * Lock a thread by setting it as locked and archiving it.
+ *
+ * @param thread - The Discord thread channel.
  */
 export async function lockThread(thread: ThreadChannel) {
   try {
     await thread.setLocked(true);
     await thread.setArchived(true);
   } catch {
-    // ignore
+    // Ignore errors during locking.
   }
 }
 
 /**
- * Store offline timestamp in OFFLINE_FILE on shutdown
+ * Store the current offline timestamp to a file.
  */
 export function storeOfflineTimestamp() {
   const now = new Date().toISOString();
@@ -101,7 +123,9 @@ export function storeOfflineTimestamp() {
 }
 
 /**
- * Read offline timestamp from OFFLINE_FILE
+ * Read the last offline timestamp from a file.
+ *
+ * @returns The offline timestamp as a string, or null if not found.
  */
 export function readOfflineTimestamp(): string | null {
   try {
