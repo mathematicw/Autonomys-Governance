@@ -181,3 +181,6 @@ There is function for swapping tokens from EVM address to Substrate (bridging.js
 It uses variablees in .env file:
 WALLET_EVM_ADDR="0x32F533Db704398F5d819A2E28bA0Bba15445E1D0"              //to be funded with faucet
 SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //signer
+
+> **Note**
+If we need EVM sign (secp256k1) the code should be modified to use `ethers`
