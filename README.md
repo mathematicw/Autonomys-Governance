@@ -183,4 +183,5 @@ WALLET_EVM_ADDR="0x32F533Db704398F5d819A2E28bA0Bba15445E1D0"              //to b
 SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //signer
 
 > **Note**
+In current realization to pay fees you have to have Substrate balance, even to use `bridging.js`.
 If we need EVM sign (secp256k1) the code should be modified to use `ethers`
