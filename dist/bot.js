@@ -199,7 +199,7 @@ client.on('interactionCreate', async (interaction) => {
             components: [row]
         });
         // Post initial progress message under spoiler.
-        const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\n` +
+        const content2 = `Voting progress: ⚠️ Keep in mind — opening the spoiler may bias your decision! ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\n` +
             `Voting tokens left: ${tokens.join(', ')}`;
         await thr.send(content2);
         await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
