@@ -36,7 +36,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
 - Example of working with the API: `examples/node/src/utils/setup.ts`
 
-> **disclaimer**: The code may be modified, making this list no fully relevant.
+> **disclaimer**: The code may be modified, making this list not fully relevant.
 
 
 
