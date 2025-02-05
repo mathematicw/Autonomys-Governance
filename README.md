@@ -80,11 +80,16 @@ The simple version (where results are saved in consensus layer) is moved to vote
  - DISCORD_TOKEN=...		// Discord Token should be obtained at discord dev portal
  - SUBSTRATE_ENDPOINT=...	// it is "wss://rpc.taurus.subspace.foundation/ws" currently
  - EVM_ENDPOINT=...		//
- - SEED_PHRASE=...		// fund this
+ - SEED_PHRASE=...		// fund this with tAI3 in Substrate
+ - DRIVE_APIKEY=...		// your Auto-drive API key
  - ROLE_ID=...			// the Discord ID of the role corresponding to the team for which the voting is being conducted
  - VOTERID_SECRET=...  		// this secret is a constant, used for calculating Vote Tokens for each participant
- - VOTING_DURATION=...		// voting thread expiration time (in hours)
+ - VOTING_DURATION=...		// voting thread expiration time in hours, 1 h by default for testing
+ - WALLET_EVM_ADDR=...		// use this only if use bridge (otherwise top up Substrate)
+ - SIGNER_SUBSTRATE_ADDR=	// the transaction signer address!
 
+
+**Bot's Algorithm:**
 
 **User Creating Threads**
 
