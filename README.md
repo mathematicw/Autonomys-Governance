@@ -43,8 +43,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 The simple version (where results are saved in consensus layer) is moved to votebot-simple directory.
 
 
-## Below is detailed description of the bot functioning
-
+## Below is detailed description of the bot algorithm
 
 
 **Bot's Slash Commands**:
@@ -89,9 +88,6 @@ The simple version (where results are saved in consensus layer) is moved to vote
  - VOTING_DURATION=...		// voting thread expiration time in hours, 1 h by default for testing
  - WALLET_EVM_ADDR=...		// use this only if use bridge (otherwise top up Substrate)
  - SIGNER_SUBSTRATE_ADDR=	// the transaction signer address!
-
-
-**Bot's Algorithm:**
 
 **User Creating Threads**
 
@@ -180,25 +176,19 @@ or
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No"
 
 
-End of description.
-
 
 **Wallet**
 To execute blockchain transactions, the bot's wallet needs to be funded.
-There is function for swapping tokens from EVM address to Substrate (bridging.js)
+There is function for swapping tokens from EVM address to Substrate, bridging.js - (not finished) so please top up Substrate.
 It uses variablees in .env file:
 WALLET_EVM_ADDR="0x32F533Db704398F5d819A2E28bA0Bba15445E1D0"              //to be funded with faucet
-SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //signer
-
-> **Note**
-In current realization to pay fees you have to have Substrate balance, even to use `bridging.js`.
-If we need EVM sign (secp256k1) the code should be modified to use `ethers`
+SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //signer (top up this one from testnet node)
+In current realization to pay fees you need Substrate balance. For signing from EVM (secp256k1) the code should be modified to use `ethers`.
 
 
+### Detailed Files Explanation
 
-Detailed Files Explanation
-
-bot.ts
+**bot.ts**
 
     Initialization:
         When the bot is ready, it reads the offline timestamp, registers commands, initializes the Substrate connection using initChain, and initializes the Auto-drive API using initDrive. Then it calls checkActiveThreads() to process any expired threads.
@@ -229,7 +219,7 @@ bot.ts
 
 
 
-blockchain.ts
+**blockchain.ts**
 
     Module Purpose:
 	This module integrates with a Substrate node and Auto-drive to handle the storage and retrieval of final voting results. The results are stored as a JSON file on Auto-drive (an IPFS-like storage system).
@@ -250,7 +240,7 @@ blockchain.ts
 	Downloads the file from Auto-drive using its CID, concatenates the received Buffer chunks, converts the result to a UTF-8 string, and parses the JSON to reconstruct the VotingResultsPayload object.
 
 
-utils.ts
+**utils.ts**
 
     File Overview:
     This utility module contains common functions used by the Discord bot. These functions include generating a vote token, formatting dates for thread expiration, checking if a thread is expired, determining if the voting is finished, marking threads as finalized (to prevent duplicate result submissions), locking threads, and storing/reading an offline timestamp.
