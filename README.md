@@ -67,7 +67,7 @@ The simple version (where results are saved in consensus layer) is moved to vote
 
 `/results <threadName>` (where threadName is the full name of the thread)
  or
-`/results <threadID>`	- retrieves voting data, related to provided name (or ID) of voting thread, from blockchain
+`/results <threadID>`	- retrieves voting data, related to provided name (or ID) of voting thread, from Auto-drive
 
 `/help`			- shows this commands tutorial (briefly).
 
