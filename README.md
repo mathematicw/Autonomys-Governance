@@ -37,7 +37,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 - Example of working with the API: `examples/node/src/utils/setup.ts`
 
 > **disclaimer**: The code may be modified, making this list not fully relevant.
-
+⚠️In this implementation, I didn’t actually use Auto-drive, but I’m working on integrating as many components of the Autonomys SDK as possible, including moving the recording of voting results to Auto-drive instead of the consensus layer.
 
 
 ## Below is detailed description of the bot functioning
