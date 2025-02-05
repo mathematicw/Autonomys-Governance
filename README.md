@@ -243,7 +243,7 @@ blockchain.ts
 	Downloads the file from Auto-drive using its CID, concatenates the received Buffer chunks, converts the result to a UTF-8 string, and parses the JSON to reconstruct the VotingResultsPayload object.
 
 
-	utils.ts
+utils.ts
 
     File Overview:
     This utility module contains common functions used by the Discord bot. These functions include generating a vote token, formatting dates for thread expiration, checking if a thread is expired, determining if the voting is finished, marking threads as finalized (to prevent duplicate result submissions), locking threads, and storing/reading an offline timestamp.
