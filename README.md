@@ -23,14 +23,16 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
 ## **To integrate Autonomys blockchain interaction into a Discord bot, the following SDK components were used:**  
 
-### **For working with transactions:**  
-- `@autonomys/auto-consensus`: `transfer.ts` and `remark.ts` modules  
-- Utilities from `@autonomys/auto-utils/src/utils/signAndSendTx.ts`  
-- Cryptographic functions from `@autonomys/auto-utils/src/crypto.ts`  
+@autonomys/auto-drive
 
-### **For connecting to a node:** 
-- API helpers from `@autonomys/auto-utils/src/api.ts`  
-- Network configurations from `@autonomys/auto-utils/src/constants/network.ts`  
+    createAutoDriveApi – Initializes the connection to Auto-drive (an IPFS-like storage).
+    uploadFile – Uploads a file (in our case, a JSON with the final voting results) to Auto-drive.
+    downloadFile – Downloads a file from Auto-drive using a CID.
+
+@autonomys/auto-utils
+
+    signAndSendTx – A utility for signing and sending transactions to the network (although in the current implementation, this function is not used for voting, it is still imported from the SDK).
+    NetworkId – A constant for defining the network (e.g., TA...). 
 
 ### **Usage examples:**
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
