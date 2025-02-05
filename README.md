@@ -31,8 +31,8 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
 @autonomys/auto-utils
 
-    signAndSendTx – A utility for signing and sending transactions to the network (although in the current implementation, this function is not used for voting, it is still imported from the SDK).
-    NetworkId – A constant for defining the network (e.g., TA...). 
+    signAndSendTx – A utility for signing and sending transactions to the network.
+    NetworkId – A constant for defining the network at Auto-drive API initialization. 
 
 ### **Usage examples:**
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
