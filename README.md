@@ -177,12 +177,12 @@ or
 
 
 
-**Wallet**
+**Wallets**
 To execute blockchain transactions, the bot's wallet needs to be funded.
 There is function for swapping tokens from EVM address to Substrate, bridging.js - (not finished) so please top up Substrate.
 It uses variablees in .env file:
-WALLET_EVM_ADDR="0x32F533Db704398F5d819A2E28bA0Bba15445E1D0"              //to be funded with faucet
-SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //signer (top up this one from testnet node)
+WALLET_EVM_ADDR=		//to be funded with faucet
+SIGNER_SUBSTRATE_ADDR=		//signer (top up this one from testnet node)
 In current realization to pay fees you need Substrate balance. For signing from EVM (secp256k1) the code should be modified to use `ethers`.
 
 
