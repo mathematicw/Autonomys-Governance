@@ -18,8 +18,7 @@ let api: ApiPromise | null = null;
 let signer: any = null; // Substrate KeyringPair
 let driveApi: any = null; // Auto-drive API instance
 
-// GenericFile interface, as it awaits by uploadFile funct.
-// Method read() returns AsyncIterable<Buffer>.
+// method read() returns AsyncIterable<Buffer>.
 interface GenericFile {
   name: string;
   size: number;
@@ -27,10 +26,10 @@ interface GenericFile {
 }
 
 /**
- * Initialization connection to Substrate.
+ * Init connection to Substrate.
  *
  * @param endpoint - RPC endpoint Substrate.
- * @param seedPhrase - Seed phrase.
+ * @param seedPhrase - wallet Seed phrase.
  */
 export async function initChain(endpoint: string, seedPhrase: string): Promise<void> {
   const provider = new WsProvider(endpoint);
@@ -41,25 +40,21 @@ export async function initChain(endpoint: string, seedPhrase: string): Promise<v
 }
 
 /**
- * Initialization Auto-drive API.
- *
- * Uses DRIVE_APIKEY from .env.
- *
- * @param endpoint - HTTP endpoint for Auto-drive (for ex, "https://api.autodrive.io").
+ * initialization  Auto-drive API.
  */
 export async function initDrive(): Promise<void> {
   driveApi = await createAutoDriveApi({ 
-    apiKey: process.env.DRIVE_APIKEY, 
-    network: "taurus" as "taurus"
+    apiKey: process.env.DRIVE_APIKEY,
+    network: "taurus" as "taurus" // or "mainnet" if in mainnet
   });
   console.log('Auto-drive API initialized.');
 }
 
 /**
- * Saves results to Auto-drive and returns CID.
+ * Save voting results on Auto-drive and return CID.
  *
- * @param payload - object VotingResultsPayload with final results.
- * @returns CID as a string.
+ * @param payload - object VotingResultsPayload with voting data.
+ * @returns CID as string.
  */
 export async function storeVotingResultsOnChain(
   payload: VotingResultsPayload
@@ -84,9 +79,9 @@ export async function storeVotingResultsOnChain(
 }
 
 /**
- * Download votig results from Auto-drive by CID.
+ * Download voting results from Auto-drive
  *
- * @param cid - CID of the file.
+ * @param cid - CID загруженного файла.
  * @returns Parsed VotingResultsPayload.
  */
 export async function retrieveVotingResults(cid: string): Promise<VotingResultsPayload> {

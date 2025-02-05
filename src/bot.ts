@@ -1,7 +1,7 @@
 // src/bot.ts
 // Main Discord bot logic.
-// upon finalizing CID is saved as a message in the thread.
-// /results looks for message with prefix "CID:" and DL final results from Auto-drive.
+// Upon voting finalizinf CID is saved in message on thread
+// Command /results looks for message with prefix "CID:" and download vote data from Auto-drive.
 
 import 'dotenv/config';
 import {
@@ -211,7 +211,7 @@ client.on('interactionCreate', async (interaction) => {
       tokens.push(tk);
     });
     await thr.send({ content: `ThreadID: ${thr.id}\n<@&${ROLE_ID}>`, components: [row] });
-    const content2 = `Voting progress:(avoid bias!) ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
+    const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
     await thr.send(content2);
     await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
   }
@@ -351,7 +351,7 @@ client.on('interactionCreate', async (interaction) => {
             votingFinished: true
           };
           const cid = await storeVotingResultsOnChain(payload);
-          await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}. Use /results <threadID> to retrieve`);
+          await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}`);
         }
       } catch (err) {
         console.error('Error storing final results on drive:', err);
@@ -359,6 +359,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       markThreadFinalized(thread.id);
     }
+    await thread.send('Voting is complete. The results have been saved on chain. Use /results <threadID> for details.');
     await lockThread(thread);
     return;
   } else {

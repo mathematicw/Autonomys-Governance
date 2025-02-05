@@ -10,10 +10,10 @@ let api = null;
 let signer = null; // Substrate KeyringPair
 let driveApi = null; // Auto-drive API instance
 /**
- * Connaction to Substrate initialization.
+ * Init connection to Substrate.
  *
  * @param endpoint - RPC endpoint Substrate.
- * @param seedPhrase - Seed phrase.
+ * @param seedPhrase - wallet Seed phrase.
  */
 async function initChain(endpoint, seedPhrase) {
     const provider = new api_1.WsProvider(endpoint);
@@ -23,23 +23,20 @@ async function initChain(endpoint, seedPhrase) {
     console.log('Substrate signing address:', signer.address);
 }
 /**
- * Initialization Auto-drive API.
- *
- * Uses var DRIVE_APIKEY from .env.
- *
+ * initialization  Auto-drive API.
  */
 async function initDrive() {
     driveApi = await (0, auto_drive_1.createAutoDriveApi)({
         apiKey: process.env.DRIVE_APIKEY,
-        network: "taurus"
+        network: "taurus" // or "mainnet" if in mainnet
     });
     console.log('Auto-drive API initialized.');
 }
 /**
- * Saves voting results to Auto-drive and returns CID.
+ * Save voting results on Auto-drive and return CID.
  *
- * @param payload - Object VotingResultsPayload with final data.
- * @returns CID as a string.
+ * @param payload - object VotingResultsPayload with voting data.
+ * @returns CID as string.
  */
 async function storeVotingResultsOnChain(payload) {
     if (!driveApi) {
@@ -61,9 +58,9 @@ async function storeVotingResultsOnChain(payload) {
     return cid;
 }
 /**
- * DL voting results from Auto-drive using CID.
+ * Download voting results from Auto-drive
  *
- * @param cid - CID of file.
+ * @param cid - CID загруженного файла.
  * @returns Parsed VotingResultsPayload.
  */
 async function retrieveVotingResults(cid) {

@@ -1,8 +1,8 @@
 "use strict";
 // src/bot.ts
 // Main Discord bot logic.
-// Upon voting finalization CID is saved in a message in the thread.
-// The /results command look for a message with prefix "CID:" and DL data from Auto-drive.
+// Upon voting finalizinf CID is saved in message on thread
+// Command /results looks for message with prefix "CID:" and download vote data from Auto-drive.
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const discord_js_1 = require("discord.js");
@@ -156,7 +156,7 @@ client.on('interactionCreate', async (interaction) => {
             tokens.push(tk);
         });
         await thr.send({ content: `ThreadID: ${thr.id}\n<@&${ROLE_ID}>`, components: [row] });
-        const content2 = `Voting progress:(avoid bias!) ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
+        const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
         await thr.send(content2);
         await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
     }
@@ -297,7 +297,7 @@ client.on('interactionCreate', async (interaction) => {
                         votingFinished: true
                     };
                     const cid = await (0, blockchain_1.storeVotingResultsOnChain)(payload);
-                    await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}. Use /results <threadID> to retrieve`);
+                    await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}`);
                 }
             }
             catch (err) {
@@ -306,6 +306,7 @@ client.on('interactionCreate', async (interaction) => {
             }
             (0, utils_1.markThreadFinalized)(thread.id);
         }
+        await thread.send('Voting is complete. The results have been saved on chain. Use /results <threadID> for details.');
         await (0, utils_1.lockThread)(thread);
         return;
     }
