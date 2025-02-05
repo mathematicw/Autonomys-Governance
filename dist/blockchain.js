@@ -1,40 +1,80 @@
 "use strict";
-// src/blockchain.ts
-// Substrate chain integration: initialize connection and submit final voting results on-chain via a remark transaction.
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initChain = initChain;
+exports.initDrive = initDrive;
 exports.storeVotingResultsOnChain = storeVotingResultsOnChain;
+exports.retrieveVotingResults = retrieveVotingResults;
 const api_1 = require("@polkadot/api");
-const auto_consensus_1 = require("@autonomys/auto-consensus");
-const auto_utils_1 = require("@autonomys/auto-utils");
+const auto_drive_1 = require("@autonomys/auto-drive");
 let api = null;
 let signer = null; // Substrate KeyringPair
+let driveApi = null; // Auto-drive API instance
 /**
- * Initialize the Substrate chain connection.
+ * Connaction to Substrate initialization.
  *
- * @param endpoint - The Substrate RPC endpoint.
- * @param seedPhrase - The seed phrase for the signing account.
+ * @param endpoint - RPC endpoint Substrate.
+ * @param seedPhrase - Seed phrase.
  */
 async function initChain(endpoint, seedPhrase) {
     const provider = new api_1.WsProvider(endpoint);
-    const _api = await api_1.ApiPromise.create({ provider });
-    const _keyring = new api_1.Keyring({ type: 'sr25519' });
-    const _signer = _keyring.addFromUri(seedPhrase);
-    api = _api;
-    signer = _signer;
+    api = await api_1.ApiPromise.create({ provider });
+    const keyring = new api_1.Keyring({ type: 'sr25519' });
+    signer = keyring.addFromUri(seedPhrase);
     console.log('Substrate signing address:', signer.address);
 }
 /**
- * Submit final voting results on-chain via a remark transaction.
- * Throws an error if the account has insufficient funds.
+ * Initialization Auto-drive API.
  *
- * @param payload - The voting results payload.
+ * Uses var DRIVE_APIKEY from .env.
+ *
+ */
+async function initDrive() {
+    driveApi = await (0, auto_drive_1.createAutoDriveApi)({
+        apiKey: process.env.DRIVE_APIKEY,
+        network: "taurus"
+    });
+    console.log('Auto-drive API initialized.');
+}
+/**
+ * Saves voting results to Auto-drive and returns CID.
+ *
+ * @param payload - Object VotingResultsPayload with final data.
+ * @returns CID as a string.
  */
 async function storeVotingResultsOnChain(payload) {
-    if (!api || !signer) {
-        throw new Error('API or signer not initialized');
+    if (!driveApi) {
+        throw new Error('Drive API not initialized');
     }
-    const remarkString = JSON.stringify(payload);
-    const tx = (0, auto_consensus_1.remark)(api, remarkString);
-    await (0, auto_utils_1.signAndSendTx)(signer, tx);
+    const data = JSON.stringify(payload);
+    const file = {
+        name: 'voting-results.json',
+        size: Buffer.from(data).length,
+        read: () => {
+            async function* generator() {
+                yield Buffer.from(data);
+            }
+            return generator();
+        }
+    };
+    const cid = await (0, auto_drive_1.uploadFile)(driveApi, file, { compression: true });
+    console.log('Voting results stored on drive, CID:', cid);
+    return cid;
+}
+/**
+ * DL voting results from Auto-drive using CID.
+ *
+ * @param cid - CID of file.
+ * @returns Parsed VotingResultsPayload.
+ */
+async function retrieveVotingResults(cid) {
+    if (!driveApi) {
+        throw new Error('Drive API not initialized');
+    }
+    const stream = await (0, auto_drive_1.downloadFile)(driveApi, cid);
+    let fileData = Buffer.alloc(0);
+    for await (const chunk of stream) {
+        fileData = Buffer.concat([fileData, chunk]);
+    }
+    const jsonString = fileData.toString('utf-8');
+    return JSON.parse(jsonString);
 }

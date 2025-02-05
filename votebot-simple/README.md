@@ -36,9 +36,8 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
 - Example of working with the API: `examples/node/src/utils/setup.ts`
 
-> **Update**: ⚠️The code just updated. The voting results are now correctly being recorded to Auto-drive and retrieved from by the `/result` command.
-
-The simple version (where results are saved in consensus layer) is moved to votebot-simple directory.
+> **disclaimer**: The code may be modified, making this list not fully relevant.
+⚠️In this implementation, I didn’t actually use Auto-drive, but I’m working on integrating as many components of the Autonomys SDK as possible, including moving the recording of voting results to Auto-drive instead of the consensus layer.
 
 
 ## Below is detailed description of the bot functioning
@@ -133,7 +132,7 @@ Upon expiration date, day 7, the bot does:
  - lock the thread, so that it will be available only for reading only (and prevent to reactivate it manually, closing again, if anyone will try to restore it),
  - create blockchain transaction.
 
-**Bot has Gone Offline?**
+**What if Bot has Gone Offline?**
 
 In case the bot has gone offline, upon resurrection it will get the list of active threads in the current channel via Discord API, and check the expiration date of opened threads:
   - If the thread's expiration date has not yet occurred - report about downtime sending normal message to the thread, including exact date-time since and until it was offline: "The bot was offline from ___ to ___. Ready to continue servicing the voting."; 
@@ -186,85 +185,3 @@ SIGNER_SUBSTRATE_ADDR="5GEstkiRc5H7GYS6NQYnxdKQQG4jYWQ9rZ1q2xqsYtbN8x36"  //sign
 > **Note**
 In current realization to pay fees you have to have Substrate balance, even to use `bridging.js`.
 If we need EVM sign (secp256k1) the code should be modified to use `ethers`
-
-
-
-Detailed Files Explanation
-
-bot.ts
-
-    Initialization:
-        When the bot is ready, it reads the offline timestamp, registers commands, initializes the Substrate connection using initChain, and initializes the Auto-drive API using initDrive. Then it calls checkActiveThreads() to process any expired threads.
-
-    Thread Processing (checkActiveThreads):
-        For every active text channel in all guilds, the bot fetches active threads.
-        For threads whose names start with "P:" or "V:" (proposal or voting threads) and which are not locked, archived, or already finalized, it checks if the thread is expired.
-        If expired, the bot sends a message indicating that voting is completed, stores the final voting results on Auto-drive via storeVotingResultsOnChain (which returns a CID), sends a message with the CID, marks the thread as finalized, and locks the thread.
-
-    Slash Commands:
-        /discussion: Creates a discussion thread.
-        /proposal: Creates a proposal thread with an expiration date.
-        /vote: Creates a voting thread with buttons for voting. It sends an initial message with vote tokens and progress information.
-        /myvotetoken: Returns the vote token for the user in the current thread.
-        /results: This command is intended to be invoked from the main channel. It finds the specified thread by ID or name. If the thread is not locked (i.e. voting is still in progress), it replies with a warning. Otherwise, it fetches the messages from the thread to extract a CID (from a message that contains "CID:"), then retrieves final results from Auto-drive using retrieveVotingResults and displays them.
-        /help: Lists available commands.
-
-    Button Interaction Handler:
-        When a vote button is pressed, the bot verifies eligibility by checking if the user's token is still present.
-        It updates the vote counts in the progress message.
-        If the final vote is cast (voting is finished), it stores the final results on Auto-drive (retrieving a CID) and sends a message in the thread with the CID. Then it locks the thread to prevent further interactions.
-
-    Utility Functions:
-        createThread: Creates a new thread in the current channel.
-        findThreadByRef: Finds a thread by its ID or name (searching active and archived threads).
-        findProgressMessage: Finds the bot’s progress message in a thread.
-        getRoleMembers: Returns a collection of guild members having a specific role.
-
-
-
-blockchain.ts
-
-    Module Purpose:
-	This module integrates with a Substrate node and Auto-drive to handle the storage and retrieval of final voting results. The results are stored as a JSON file on Auto-drive (an IPFS-like storage system).
-
-    VotingResultsPayload Interface:
-	Defines the shape of the voting results object, including thread ID, creation date, full thread name, eligible participant count, votes summary, and status flags.
-
-    initChain Function:
-	Connects to the Substrate node using the provided RPC endpoint and seed phrase. It creates a KeyringPair used to sign transactions.
-
-    initDrive Function:
-	Initializes the Auto-drive API using the API key (DRIVE_APIKEY) from the environment and setting the network to "taurus". This API instance is used for file upload/download operations.
-
-    storeVotingResultsOnChain Function:
-	Converts the VotingResultsPayload to JSON, wraps it in a GenericFile object (with properties name, size, and a read method that returns an async iterable), and uploads it to Auto-drive. It returns the CID (Content Identifier) for the stored file.
-
-    retrieveVotingResults Function:
-	Downloads the file from Auto-drive using its CID, concatenates the received Buffer chunks, converts the result to a UTF-8 string, and parses the JSON to reconstruct the VotingResultsPayload object.
-
-
-	utils.ts
-
-    File Overview:
-    This utility module contains common functions used by the Discord bot. These functions include generating a vote token, formatting dates for thread expiration, checking if a thread is expired, determining if the voting is finished, marking threads as finalized (to prevent duplicate result submissions), locking threads, and storing/reading an offline timestamp.
-
-    generateVoteToken:
-    This function concatenates a user ID, thread ID, and a secret (from environment variables) to form a base string, computes a simple hash from it, and converts the result into an 8-character hexadecimal token. This token is used to uniquely identify a user's eligibility to vote in a specific thread.
-
-    formatExpirationDate:
-    Given the current date and a number of hours to add (representing the voting duration), this function returns a formatted date string (YYYY-MM-DD) which is used when constructing thread names.
-
-    isExpiredThread:
-    This function checks whether the current time is after the thread's creation time plus the voting duration. It uses the dayjs library for date manipulation.
-
-    isVotingFinished:
-    Voting is considered finished if the total number of votes meets or exceeds the total number of eligible participants or if the voting time has expired.
-
-    markThreadFinalized / isThreadFinalized:
-    These functions maintain a set of thread IDs for which final results have been submitted, ensuring that final results are not stored more than once.
-
-    lockThread:
-    This function locks and archives a thread, preventing further interactions. If an error occurs during locking (for example, due to insufficient permissions), it is silently ignored.
-
-    storeOfflineTimestamp / readOfflineTimestamp:
-    These functions write and read a timestamp to/from a file. This can be used to track how long the bot was offline.

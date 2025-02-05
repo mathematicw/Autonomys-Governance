@@ -1,7 +1,7 @@
 "use strict";
 // src/utils.ts
-// Common logic: token generation, expiration checking using thread.createdAt,
-// offline timestamp storage, and thread finalization tracking.
+// Common logic: token generation, expiration checking, offline timestamp storage,
+// and thread finalization tracking.
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,10 +15,11 @@ exports.isThreadFinalized = isThreadFinalized;
 exports.lockThread = lockThread;
 exports.storeOfflineTimestamp = storeOfflineTimestamp;
 exports.readOfflineTimestamp = readOfflineTimestamp;
+// Import required modules.
 const fs_1 = __importDefault(require("fs"));
 const dayjs_1 = __importDefault(require("dayjs"));
 const OFFLINE_FILE = 'offline.json';
-// Set to track threads for which final results have already been submitted.
+// A Set to track threads for which final results have been submitted.
 const finalizedThreads = new Set();
 /**
  * Generate a short VoteToken based on userId, threadId, and a secret.
@@ -52,11 +53,12 @@ function formatExpirationDate(date, hoursToAdd) {
     return (0, dayjs_1.default)(date).add(hoursToAdd, 'hour').format('YYYY-MM-DD');
 }
 /**
- * Check if a thread has expired by using its creation time plus the voting duration.
+ * Check if a thread has expired.
+ * Instead of parsing the date from the thread name, we use the thread's creation time.
  *
  * @param thread - The Discord thread channel.
- * @param votingDurationHours - The voting duration (in hours).
- * @returns True if current time is after (thread.createdAt + votingDurationHours).
+ * @param votingDurationHours - The voting duration in hours (from .env).
+ * @returns True if the current time is after (thread.createdAt + votingDurationHours).
  */
 function isExpiredThread(thread, votingDurationHours) {
     const creationTime = (0, dayjs_1.default)(thread.createdAt);
@@ -65,11 +67,11 @@ function isExpiredThread(thread, votingDurationHours) {
 }
 /**
  * Determine if voting is finished.
- * Voting is finished if the total votes are at least equal to total participants, or if time has expired.
+ * Voting is finished if total votes are at least equal to total participants or time has expired.
  *
  * @param votesCount - Total number of votes recorded.
  * @param totalParticipants - Total number of eligible participants.
- * @param timeExpired - Boolean indicating whether the voting duration has expired.
+ * @param timeExpired - Boolean indicating if the voting duration has expired.
  * @returns True if voting is finished.
  */
 function isVotingFinished(votesCount, totalParticipants, timeExpired) {
@@ -80,7 +82,7 @@ function isVotingFinished(votesCount, totalParticipants, timeExpired) {
     return false;
 }
 /**
- * Mark a thread as finalized so that final results are not submitted more than once.
+ * Mark a thread as finalized to prevent duplicate on-chain submissions.
  *
  * @param threadId - The ID of the thread.
  */
@@ -91,7 +93,7 @@ function markThreadFinalized(threadId) {
  * Check if a thread has already been finalized.
  *
  * @param threadId - The ID of the thread.
- * @returns True if the thread is already finalized.
+ * @returns True if the thread is marked as finalized.
  */
 function isThreadFinalized(threadId) {
     return finalizedThreads.has(threadId);
@@ -111,14 +113,14 @@ async function lockThread(thread) {
     }
 }
 /**
- * Store the current offline timestamp in a file.
+ * Store the current offline timestamp to a file.
  */
 function storeOfflineTimestamp() {
     const now = new Date().toISOString();
     fs_1.default.writeFileSync(OFFLINE_FILE, JSON.stringify({ offlineAt: now }), 'utf-8');
 }
 /**
- * Read the last offline timestamp from the file.
+ * Read the last offline timestamp from a file.
  *
  * @returns The offline timestamp as a string, or null if not found.
  */
