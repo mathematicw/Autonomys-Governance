@@ -155,7 +155,6 @@ When bot needs to send bc transaction , the following data will be included to i
 	- "Total role members:"			// get number of all members of the role, specified in `.env` file at that moment
 	- "Participants (userID):" 		// get all members of the role, specified in `.env` file at that moment
 	- "Voting results:" 			// [FOR] , [AGAINST] , [ABSTAIN] values from voting counter
-	- "Voting tokens left:"			// list of VoteTokens which were not used
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No".
 
 **Retrieving Voting Results**
@@ -172,11 +171,9 @@ or
 	- "Total role members:"			// get number of all members of the role, specified in `.env` file at that moment
 	- "Participants (userID):" 		// get all members of the role, specified in `.env` file at that moment
 	- "Voting results:" 			// [FOR], [AGAINST], [ABSTAIN] values from voting counter
-	- "Voting tokens left:"			// list of VoteTokens which were not used
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No"
 
-:Note:  
-`/results` can be ran only from outer chat, not from thread itself!
+_Note:_ `/results` can be ran only from outer chat, not from thread itself!
 
 
 **Wallets**
