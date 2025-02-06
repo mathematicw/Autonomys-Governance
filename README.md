@@ -159,6 +159,8 @@ When bot needs to send bc transaction , the following data will be included to i
 
 **Retrieving Voting Results**
 
+_Note:_ `/results` can be ran only from outer chat, not from thread itself!
+
 The commands:
 `/results <threadName>`
 or
@@ -172,8 +174,6 @@ or
 	- "Participants (userID):" 		// get all members of the role, specified in `.env` file at that moment
 	- "Voting results:" 			// [FOR], [AGAINST], [ABSTAIN] values from voting counter
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No"
-
-_Note:_ `/results` can be ran only from outer chat, not from thread itself!
 
 
 **Wallets**
