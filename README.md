@@ -175,7 +175,8 @@ or
 	- "Voting tokens left:"			// list of VoteTokens which were not used
 	- "Deadline missed:"			// the value for true is "Yes" , the value for false is "No"
 
-
+:::Note::: 
+`/results` can be ran only from outer chat, not from thread itself!
 
 **Wallets**
 To execute blockchain transactions, the bot's wallet needs to be funded.
