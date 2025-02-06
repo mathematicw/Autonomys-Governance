@@ -8,7 +8,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 
     📜 Thread-based governance with automated creation of discussions, proposals, and voting threads
 
-    ⏱️ Time-bound voting with auto-locking threads after expiration (7 days by default)
+    ⏱️ Time-bound voting with auto-locking threads after expiration (7 days for production)
 
     🔗 Blockchain integration to immutably store voting results on Autonomys Auto-drive
 
