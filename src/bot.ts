@@ -1,7 +1,10 @@
 // src/bot.ts
 // Main Discord bot logic.
-// Upon voting finalizinf CID is saved in message on thread
-// Command /results looks for message with prefix "CID:" and download vote data from Auto-drive.
+//
+// When a voting session is finalized, the bot stores the final voting results on Auto-drive
+// and posts a message in the thread containing the CID (Content Identifier).
+// The `/results` command (invoked from the channel, not from the thread itself) retrieves this CID from the thread's messages,
+// downloads the final results from Auto-drive, and returns them to the user.
 
 import 'dotenv/config';
 import {
@@ -46,6 +49,7 @@ import {
   formatExpirationDate
 } from './utils';
 
+// Load environment variables
 const {
   DISCORD_TOKEN,
   SUBSTRATE_ENDPOINT,
@@ -55,11 +59,13 @@ const {
   VOTING_DURATION
 } = process.env;
 
+// Parse voting duration (in hours); default is 168 hours (7 days)
 const VOTING_DURATION_HOURS = parseInt(VOTING_DURATION || '168', 10);
 const BOT_TOKEN = DISCORD_TOKEN || '';
 
 let offlineSince: string | null = null;
 
+// Create Discord client with required intents and partials
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -70,6 +76,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+// Define slash commands used by the bot
 const commands = [
   new SlashCommandBuilder()
     .setName('discussion')
@@ -95,6 +102,11 @@ const commands = [
     .setDescription('List bot commands')
 ].map(c => c.toJSON());
 
+/**
+ * Register slash commands with Discord.
+ *
+ * @param guildId - (Optional) Guild ID to register commands for a specific server.
+ */
 async function registerCommands(guildId?: string) {
   const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
   if (!guildId) {
@@ -104,12 +116,14 @@ async function registerCommands(guildId?: string) {
   }
 }
 
+// Save offline timestamp on exit
 process.on('beforeExit', () => storeOfflineTimestamp());
 process.on('SIGINT', () => {
   storeOfflineTimestamp();
   process.exit(0);
 });
 
+// When the bot is ready, initialize connections and register commands.
 client.once('ready', async () => {
   console.log(`Bot started as ${client.user?.tag}`);
   offlineSince = readOfflineTimestamp();
@@ -119,6 +133,12 @@ client.once('ready', async () => {
   await checkActiveThreads();
 });
 
+/**
+ * Check all active threads in all guilds.
+ * For each thread that is a proposal or voting thread and is expired,
+ * the bot sends a final message, stores results on Auto-drive, posts the CID,
+ * marks the thread as finalized, and locks the thread.
+ */
 async function checkActiveThreads() {
   const guilds = client.guilds.cache;
   for (const [_, guild] of guilds) {
@@ -131,9 +151,11 @@ async function checkActiveThreads() {
         const textCh = chData as TextChannel;
         const activeThreads = await textCh.threads.fetchActive();
         activeThreads.threads.forEach(async (thread) => {
+	  // Process only threads with prefix "P:" or "V:" (proposal or voting threads)
           if (!thread.name.startsWith('P:') && !thread.name.startsWith('V:')) return;
           if (thread.locked || thread.archived || isThreadFinalized(thread.id)) return;
           if (isExpiredThread(thread, VOTING_DURATION_HOURS)) {
+	    // Send final message and store results on Auto-drive
             await thread.send("Voting completed. Thread has been successfully locked.");
             const cid = await storeVotingResultsOnChain({
               votingThreadId: thread.id,
@@ -145,6 +167,7 @@ async function checkActiveThreads() {
               missedDeadline: true,
               votingFinished: true
             });
+	    // Post a message with the CID in the thread
             await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}`);
             markThreadFinalized(thread.id);
             await lockThread(thread);
@@ -155,6 +178,8 @@ async function checkActiveThreads() {
   }
 }
 
+
+// Handle slash commands
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName } = interaction;
@@ -165,6 +190,7 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'discussion') {
+    // Create a discussion thread without expiration.
     const subject = interaction.options.getString('subject', true);
     const name = `D:${subject}`;
     const thr = await createThread(interaction, name);
@@ -176,6 +202,7 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'proposal') {
+    // Create a proposal thread with expiration.
     await guild.members.fetch();
     const subject = interaction.options.getString('subject', true);
     const expStr = formatExpirationDate(new Date(), VOTING_DURATION_HOURS);
@@ -190,6 +217,7 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'vote') {
+    // Create a voting thread with expiration.
     await guild.members.fetch();
     const subject = interaction.options.getString('subject', true);
     const expStr = formatExpirationDate(new Date(), VOTING_DURATION_HOURS);
@@ -199,6 +227,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ content: 'Error while creating voting thread.', ephemeral: true });
       return;
     }
+    // Create voting interface buttons
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId('vote_for').setLabel('FOR').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('vote_against').setLabel('AGAINST').setStyle(ButtonStyle.Danger),
@@ -206,17 +235,21 @@ client.on('interactionCreate', async (interaction) => {
     );
     const mems = getRoleMembers(guild);
     const tokens: string[] = [];
+    // Generate a vote token for each eligible member
     mems.forEach(m => {
       const tk = generateVoteToken(m.id, thr.id, VOTERID_SECRET || '');
       tokens.push(tk);
     });
+    // Send a message with thread ID, mention role and voting buttons
     await thr.send({ content: `ThreadID: ${thr.id}\n<@&${ROLE_ID}>`, components: [row] });
+    // Send initial progress message with spoiler formatting
     const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
     await thr.send(content2);
     await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
   }
   
   if (commandName === 'myvotetoken') {
+    // Return the vote token for the user in the current thread.
     const thr = interaction.channel;
     if (!thr || thr.type !== ChannelType.PublicThread) {
       await interaction.reply({ content: 'This command only works in a thread.', ephemeral: true });
@@ -227,17 +260,20 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'results') {
+    // This command is invoked from the main channel.
+    // It looks for the CID in the thread messages and retrieves final results from Auto-drive.
     const ref = interaction.options.getString('threadref', true);
     const thr = await findThreadByRef(interaction, ref);
     if (!thr) {
       await interaction.reply({ content: 'Thread not found.', ephemeral: true });
       return;
     }
+    // Ensure thread is finished
     if (!thr.locked) {
       await interaction.reply({ content: 'Voting is still in progress! Results will be available after it ends!', ephemeral: true });
       return;
     }
-    // Поиск сообщения с CID
+    // Fetch the last 50 messages from the thread to find the CID
     const messages = await thr.messages.fetch({ limit: 50 });
     let cid: string | null = null;
     messages.forEach(msg => {
@@ -250,6 +286,7 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ content: 'CID not found in thread messages.', ephemeral: true });
       return;
     }
+    // Retrieve final voting results from Auto-drive using the CID
     try {
       const results = await retrieveVotingResults(cid);
       const replyText = 
@@ -266,6 +303,7 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'help') {
+    // Display a list of available commands.
     const msg = `Commands:
     /discussion <subject>
     /proposal <subject>
@@ -277,6 +315,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// Button interaction handler: processes vote button clicks.
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
   const buttonInteraction = interaction as ButtonInteraction;
@@ -288,11 +327,13 @@ client.on('interactionCreate', async (interaction) => {
     await lockThread(thread);
     return;
   }
+  // Get the progress message that holds current vote counts and remaining tokens.
   const pm = await findProgressMessage(thread);
   if (!pm) {
     await buttonInteraction.reply({ content: 'No voting data found in this thread.', ephemeral: true });
     return;
   }
+  // Parse the progress message to extract current counts and tokens left.
   let forCount = 0, againstCount = 0, abstainCount = 0;
   let tokensLeft: string[] = [];
   {
@@ -312,14 +353,17 @@ client.on('interactionCreate', async (interaction) => {
       }
     }
   }
+  // Generate a vote token for the user.
   const token = generateVoteToken(buttonInteraction.user.id, thread.id, VOTERID_SECRET || '');
   if (!tokensLeft.includes(token)) {
     await buttonInteraction.reply({ content: 'You are either not eligible or have already used your token!', ephemeral: true });
     return;
   }
+  // Update vote counts based on the button pressed.
   if (customId === 'vote_for') forCount++;
   if (customId === 'vote_against') againstCount++;
   if (customId === 'vote_abstain') abstainCount++;
+  // Remove the user's token from the list so it cannot be reused.
   const newLeft = tokensLeft.filter(t => t !== token);
   const guild = buttonInteraction.guild;
   let totalMems = 0;
@@ -328,12 +372,14 @@ client.on('interactionCreate', async (interaction) => {
   }
   const totalVotes = forCount + againstCount + abstainCount;
   const finished = isVotingFinished(totalVotes, totalMems, false);
+  // Update the progress message with new counts.
   const newContent =
     `Voting progress: ||FOR: ${forCount} | AGAINST: ${againstCount} | ABSTAIN: ${abstainCount}||\n` +
     `Voting tokens left: ${newLeft.join(', ')}`;
   await pm.edit({ content: newContent });
   
   if (finished) {
+    // If this vote completes the voting session, record final results.
     await buttonInteraction.reply({ content: `Your vote is recorded. This was the final vote.`, ephemeral: true });
     if (!isThreadFinalized(thread.id)) {
       try {
@@ -351,6 +397,7 @@ client.on('interactionCreate', async (interaction) => {
             votingFinished: true
           };
           const cid = await storeVotingResultsOnChain(payload);
+	  // Post the CID in the thread so that it can be retrieved later.
           await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}`);
         }
       } catch (err) {
@@ -367,6 +414,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// Handler for thread updates to enforce thread naming and locking policies.
 client.on('threadUpdate', async (oldThread, newThread) => {
   if (oldThread.name.startsWith('V:') && !newThread.name.startsWith('V:')) {
     try {
@@ -380,6 +428,13 @@ client.on('threadUpdate', async (oldThread, newThread) => {
   }
 });
 
+/**
+ * Create a new thread in the channel.
+ *
+ * @param interaction - The chat input command interaction.
+ * @param name - The desired thread name.
+ * @returns The created ThreadChannel or null if creation fails.
+ */
 async function createThread(
   interaction: ChatInputCommandInteraction,
   name: string
@@ -392,6 +447,13 @@ async function createThread(
   });
 }
 
+/**
+ * Find a thread by its name or ID.
+ *
+ * @param interaction - The command interaction.
+ * @param ref - The thread name or ID.
+ * @returns The found ThreadChannel or null.
+ */
 async function findThreadByRef(
   interaction: CommandInteraction,
   ref: string
@@ -413,6 +475,12 @@ async function findThreadByRef(
   return found;
 }
 
+/**
+ * Find the bot's progress message in a thread.
+ *
+ * @param thread - The Discord thread channel.
+ * @returns The progress Message or null if not found.
+ */
 async function findProgressMessage(thread: ThreadChannel): Promise<Message | null> {
   const msgs = await thread.messages.fetch({ limit: 50 });
   return msgs.find(m =>
@@ -420,6 +488,12 @@ async function findProgressMessage(thread: ThreadChannel): Promise<Message | nul
   ) || null;
 }
 
+/**
+ * Return the collection of guild members that have the role specified by ROLE_ID.
+ *
+ * @param guild - The Discord guild.
+ * @returns A Collection of GuildMember.
+ */
 function getRoleMembers(guild: any): Collection<string, GuildMember> {
   const role = guild.roles.cache.get(ROLE_ID || '');
   if (!role) return new Collection();
@@ -427,4 +501,3 @@ function getRoleMembers(guild: any): Collection<string, GuildMember> {
 }
 
 client.login(BOT_TOKEN);
-

@@ -3,6 +3,9 @@ import { signAndSendTx } from '@autonomys/auto-utils';
 import { createAutoDriveApi, uploadFile, downloadFile } from '@autonomys/auto-drive';
 import { NetworkId } from '@autonomys/auto-utils';
 
+/**
+ * VotingResultsPayload describes the structure of the final voting results data.
+ */
 export interface VotingResultsPayload {
   votingThreadId: string;
   dateOfCreating: string;
@@ -15,10 +18,11 @@ export interface VotingResultsPayload {
 }
 
 let api: ApiPromise | null = null;
-let signer: any = null; // Substrate KeyringPair
-let driveApi: any = null; // Auto-drive API instance
+let signer: any = null; // Substrate KeyringPair used for signing transactions
+let driveApi: any = null; // Auto-drive API instance used for file storage
 
-// method read() returns AsyncIterable<Buffer>.
+// GenericFile interface as expected by the uploadFile function.
+// The read() method returns an AsyncIterable<Buffer> containing the file data.
 interface GenericFile {
   name: string;
   size: number;
@@ -40,7 +44,14 @@ export async function initChain(endpoint: string, seedPhrase: string): Promise<v
 }
 
 /**
- * initialization  Auto-drive API.
+ * Initializes the Auto-drive API.
+ *
+ * This function uses the DRIVE_APIKEY environment variable (set in .env).
+ * The Auto-drive API is used for storing and retrieving files (voting results).
+ *
+ * Note: The network parameter is cast to "taurus" as required by the ConnectionOptions.
+ *
+ * @returns A promise that resolves when the Auto-drive API is initialized.
  */
 export async function initDrive(): Promise<void> {
   driveApi = await createAutoDriveApi({ 
@@ -51,10 +62,13 @@ export async function initDrive(): Promise<void> {
 }
 
 /**
- * Save voting results on Auto-drive and return CID.
+ * Stores the final voting results on Auto-drive and returns the resulting CID.
  *
- * @param payload - object VotingResultsPayload with voting data.
- * @returns CID as string.
+ * This function converts the VotingResultsPayload into a JSON string,
+ * wraps it in a GenericFile object, and uploads it to Auto-drive using the uploadFile function.
+ *
+ * @param payload - The final voting results data.
+ * @returns The CID (Content Identifier) of the stored file as a string.
  */
 export async function storeVotingResultsOnChain(
   payload: VotingResultsPayload
@@ -78,11 +92,16 @@ export async function storeVotingResultsOnChain(
   return cid;
 }
 
+
 /**
- * Download voting results from Auto-drive
+ * Retrieves the voting results from Auto-drive using the given CID.
  *
- * @param cid - CID загруженного файла.
- * @returns Parsed VotingResultsPayload.
+ * This function downloads the file as an async iterable of Buffer chunks,
+ * concatenates them into a single Buffer, converts it into a UTF-8 string,
+ * and parses the JSON to return a VotingResultsPayload object.
+ *
+ * @param cid - The CID of the stored voting results file.
+ * @returns The parsed VotingResultsPayload.
  */
 export async function retrieveVotingResults(cid: string): Promise<VotingResultsPayload> {
   if (!driveApi) {

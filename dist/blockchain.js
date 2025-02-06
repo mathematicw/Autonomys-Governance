@@ -7,8 +7,8 @@ exports.retrieveVotingResults = retrieveVotingResults;
 const api_1 = require("@polkadot/api");
 const auto_drive_1 = require("@autonomys/auto-drive");
 let api = null;
-let signer = null; // Substrate KeyringPair
-let driveApi = null; // Auto-drive API instance
+let signer = null; // Substrate KeyringPair used for signing transactions
+let driveApi = null; // Auto-drive API instance used for file storage
 /**
  * Init connection to Substrate.
  *
@@ -23,7 +23,14 @@ async function initChain(endpoint, seedPhrase) {
     console.log('Substrate signing address:', signer.address);
 }
 /**
- * initialization  Auto-drive API.
+ * Initializes the Auto-drive API.
+ *
+ * This function uses the DRIVE_APIKEY environment variable (set in .env).
+ * The Auto-drive API is used for storing and retrieving files (voting results).
+ *
+ * Note: The network parameter is cast to "taurus" as required by the ConnectionOptions.
+ *
+ * @returns A promise that resolves when the Auto-drive API is initialized.
  */
 async function initDrive() {
     driveApi = await (0, auto_drive_1.createAutoDriveApi)({
@@ -33,10 +40,13 @@ async function initDrive() {
     console.log('Auto-drive API initialized.');
 }
 /**
- * Save voting results on Auto-drive and return CID.
+ * Stores the final voting results on Auto-drive and returns the resulting CID.
  *
- * @param payload - object VotingResultsPayload with voting data.
- * @returns CID as string.
+ * This function converts the VotingResultsPayload into a JSON string,
+ * wraps it in a GenericFile object, and uploads it to Auto-drive using the uploadFile function.
+ *
+ * @param payload - The final voting results data.
+ * @returns The CID (Content Identifier) of the stored file as a string.
  */
 async function storeVotingResultsOnChain(payload) {
     if (!driveApi) {
@@ -58,10 +68,14 @@ async function storeVotingResultsOnChain(payload) {
     return cid;
 }
 /**
- * Download voting results from Auto-drive
+ * Retrieves the voting results from Auto-drive using the given CID.
  *
- * @param cid - CID загруженного файла.
- * @returns Parsed VotingResultsPayload.
+ * This function downloads the file as an async iterable of Buffer chunks,
+ * concatenates them into a single Buffer, converts it into a UTF-8 string,
+ * and parses the JSON to return a VotingResultsPayload object.
+ *
+ * @param cid - The CID of the stored voting results file.
+ * @returns The parsed VotingResultsPayload.
  */
 async function retrieveVotingResults(cid) {
     if (!driveApi) {
