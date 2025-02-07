@@ -260,35 +260,58 @@ client.on('interactionCreate', async (interaction) => {
   }
   
   if (commandName === 'results') {
+    // Step1: checking if the channel is not an archived thread
+    if (
+      interaction.channel?.type === ChannelType.PublicThread
+      && interaction.channel.archived
+    ) {
+      // Try to warn that it's not allowed
+      try {
+	await interaction.reply({
+          content: 'This is archived thread. Please run `/results` from a non-archived channel!',
+          ephemeral: true
+	});
+      } catch (err) {
+	console.error('Cannot reply in archived thread:', err);
+      }
+      return;
+      }
+    // Step 2: This is not archived thread!
+    // Defer the command so Discord knows we're working on a reply 
+    await interaction.deferReply({ ephemeral: false });
+
     try {
-    // This command is invoked from the main channel.
+    // This command is invoked from a channel.
     // It looks for the CID in the thread messages and retrieves final results from Auto-drive.
     const ref = interaction.options.getString('threadref', true);
     const thr = await findThreadByRef(interaction, ref);
     if (!thr) {
-      await interaction.reply({ content: 'Thread not found. Invoke `/results` only from main chat!', ephemeral: true });
+      await interaction.editReply({ content: 'Thread not found. Do not run `/results` from a thread'});
       return;
     }
+
     // Ensure thread is finished
     if (!thr.locked) {
-      await interaction.reply({ content: 'Voting is still in progress! Results will be available after it ends!', ephemeral: true });
+      await interaction.editReply({ content: 'Voting is still in progress! Results will be available after it ends!'});
       return;
     }
+
     // Fetch the last 50 messages from the thread to find the CID
     const messages = await thr.messages.fetch({ limit: 50 });
     let cid: string | null = null;
-    messages.forEach(msg => {
+    for (const [_, msg] of messages) {
+    ////messages.forEach(msg => {
       const match = msg.content.match(/CID:\s*([^\s]+)/);
       if (match) {
         cid = match[1];
+	break;
       }
-    });
+    }
     if (!cid) {
-      await interaction.reply({ content: 'CID not found in thread messages.', ephemeral: true });
+      await interaction.editReply({ content: 'CID not found in thread messages.' });
       return;
     }
-    // Retrieve final voting results from Auto-drive using the CID
-    
+      // Potentially long operation: retrieve final voting results from Auto-drive using the CID 
       const results = await retrieveVotingResults(cid);
       const replyText = 
         `Final Results (retrieved from Auto-drive):\n` +
@@ -299,19 +322,21 @@ client.on('interactionCreate', async (interaction) => {
         `Votes: ${results.votes}\n` +
         `Deadline missed: ${results.missedDeadline ? 'Yes' : 'No'}\n` +
         `Voting finished: ${results.votingFinished ? 'Yes' : 'No'}`;
-      await interaction.reply({ content: replyText, ephemeral: false });
+
+      //Step3: editing the deferred reply with the final message
+      await interaction.editReply({ content: replyText });
+
     } catch (err) {
-      // try and log "Unknown interaction"
+      // Catch any error that occurs, e.g. "Failed to download file"
       console.error('Error in /results command:', err);
-      // Optionally try a final error reply (in case the interaction is still valid)
+
       try {
-	if (interaction.isRepliable()) {
-	  await interaction.reply({ content: `Error retrieving results from Auto-drive: ${err}`, ephemeral: true });
-        }
-      } catch (e2) {
-	// If cannot reply anymore, just ignore to prevent a crash
-	console.error('Could not reply with error (interaction invalid).', e2);
-        }
+        // Attempt to edit the deferred reply with an error message
+        await interaction.editReply({ content: `Error retrieving results from Auto-drive: ${err}` });
+      } catch (editErr) {
+        // If cannot even edit the reply (unknown interaction, etc.), log and do nothing else
+        console.error('Could not edit reply (interaction invalid):', editErr);
+       }
      }
   }
   
@@ -322,7 +347,7 @@ client.on('interactionCreate', async (interaction) => {
     /proposal <subject>
     /vote <subject>
     /myVoteToken
-    /results <threadName|threadID>
+    /results <threadName|threadID> (Do not run from threads)
     /help`;
     await interaction.reply({ content: msg, ephemeral: true });
   }
@@ -419,7 +444,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       markThreadFinalized(thread.id);
     }
-    await thread.send('Voting complete. Results saved to Auto-drive and available via `/results <ThreadID>` command (not inside threads).');
+    await thread.send('Use `/results <ThreadID>` command to view  voting results (not inside threads!).');
     await lockThread(thread);
     return;
   } else {
