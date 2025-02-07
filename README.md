@@ -38,9 +38,8 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
 - Example of working with the API: `examples/node/src/utils/setup.ts`
 
-> **Update**: ⚠️The code just updated. The voting results are now correctly being recorded to Auto-drive and retrieved from by the `/result` command.
-
-The simple version (where results are saved in consensus layer) is moved to votebot-simple directory.
+> **Update**: ⚠️The code just updated. The voting results are now correctly being recorded to Auto-drive and retrieved from by the `/result` command. The simple version (where results are saved in consensus layer) is moved to votebot-simple directory. 
+This is, of course, not the final version—bugs are being fixed as they are found, and new ideas for improving functionality are continuously implemented.
 
 
 ## Below is detailed description of the bot algorithm
