@@ -17,7 +17,7 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
     🛡️ Tamper-proof design with thread name enforcement and vote token validation
 
     ☀️ The key innovation is using the thread's own messages as the source of truth,
-       allowing the bot to rebuild its state completely from Discord's API after any downtime.
+       allowing the bot to rebuild its state completely rom Discord's API after downtime.
 
 
 
@@ -38,8 +38,9 @@ This is a Discord Governance Bot for the Autonomys blockchain that enables:
 - Example of sending transactions: `examples/node/src/utils/signAndSend.ts`  
 - Example of working with the API: `examples/node/src/utils/setup.ts`
 
-> **Update**: ⚠️The code just updated. The voting results are now correctly being recorded to Auto-drive and retrieved from by the `/result` command. The simple version (where results are saved in consensus layer) is moved to votebot-simple directory. 
-This is, of course, not the final version—bugs are being fixed as they are found, and new ideas for improving functionality are continuously implemented.
+> **The Code is Updated**: Some bugs have been fixed, various unexpected command usage scenarios have been accounted for, the result display design has been improved. Detailed comments have been added! 
+There stil is the simple version, where results are saved in consensus layer, in the votebot-simple directory. Just for an example.
+This is, of course, not the final version - new ideas for improving functionality are continuously implemented.
 
 
 ## Below is detailed description of the bot algorithm
