@@ -202,45 +202,58 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: `Your VoteToken: ${vt}`, ephemeral: true });
     }
     if (commandName === 'results') {
-        // This command is invoked from the main channel.
-        // It looks for the CID in the thread messages and retrieves final results from Auto-drive.
-        const ref = interaction.options.getString('threadref', true);
-        const thr = await findThreadByRef(interaction, ref);
-        if (!thr) {
-            await interaction.reply({ content: 'Thread not found.', ephemeral: true });
-            return;
-        }
-        // Ensure thread is finished
-        if (!thr.locked) {
-            await interaction.reply({ content: 'Voting is still in progress! Results will be available after it ends!', ephemeral: true });
-            return;
-        }
-        // Fetch the last 50 messages from the thread to find the CID
-        const messages = await thr.messages.fetch({ limit: 50 });
-        let cid = null;
-        messages.forEach(msg => {
-            const match = msg.content.match(/CID:\s*([^\s]+)/);
-            if (match) {
-                cid = match[1];
-            }
-        });
-        if (!cid) {
-            await interaction.reply({ content: 'CID not found in thread messages.', ephemeral: true });
-            return;
-        }
-        // Retrieve final voting results from Auto-drive using the CID
         try {
+            // This command is invoked from the main channel.
+            // It looks for the CID in the thread messages and retrieves final results from Auto-drive.
+            const ref = interaction.options.getString('threadref', true);
+            const thr = await findThreadByRef(interaction, ref);
+            if (!thr) {
+                await interaction.reply({ content: 'Thread not found. Invoke `/results` only from main chat!', ephemeral: true });
+                return;
+            }
+            // Ensure thread is finished
+            if (!thr.locked) {
+                await interaction.reply({ content: 'Voting is still in progress! Results will be available after it ends!', ephemeral: true });
+                return;
+            }
+            // Fetch the last 50 messages from the thread to find the CID
+            const messages = await thr.messages.fetch({ limit: 50 });
+            let cid = null;
+            messages.forEach(msg => {
+                const match = msg.content.match(/CID:\s*([^\s]+)/);
+                if (match) {
+                    cid = match[1];
+                }
+            });
+            if (!cid) {
+                await interaction.reply({ content: 'CID not found in thread messages.', ephemeral: true });
+                return;
+            }
+            // Retrieve final voting results from Auto-drive using the CID
             const results = await (0, blockchain_1.retrieveVotingResults)(cid);
             const replyText = `Final Results (retrieved from Auto-drive):\n` +
                 `Thread: ${results.fullThreadName}\n` +
-                `Eligible participants: ${results.eligibleCount}\n` +
+                `Date of creating: ${results.dateOfCreating}\n` +
+                `Number of participants: ${results.eligibleCount}\n` +
+                `Participants: ${results.allEligibleMembers.join(', ')}\n` +
                 `Votes: ${results.votes}\n` +
                 `Deadline missed: ${results.missedDeadline ? 'Yes' : 'No'}\n` +
                 `Voting finished: ${results.votingFinished ? 'Yes' : 'No'}`;
             await interaction.reply({ content: replyText, ephemeral: false });
         }
         catch (err) {
-            await interaction.reply({ content: `Error retrieving results from Auto-drive: ${err}`, ephemeral: true });
+            // try and log "Unknown interaction"
+            console.error('Error in /results command:', err);
+            // Optionally try a final error reply (in case the interaction is still valid)
+            try {
+                if (interaction.isRepliable()) {
+                    await interaction.reply({ content: `Error retrieving results from Auto-drive: ${err}`, ephemeral: true });
+                }
+            }
+            catch (e2) {
+                // If cannot reply anymore, just ignore to prevent a crash
+                console.error('Could not reply with error (interaction invalid).', e2);
+            }
         }
     }
     if (commandName === 'help') {
@@ -352,7 +365,7 @@ client.on('interactionCreate', async (interaction) => {
             }
             (0, utils_1.markThreadFinalized)(thread.id);
         }
-        await thread.send('Voting is complete. The results have been saved on chain. Use /results <threadID> for details.');
+        await thread.send('Voting complete. Results saved to Auto-drive and available via `/results <ThreadID>` command (not inside threads).');
         await (0, utils_1.lockThread)(thread);
         return;
     }
@@ -387,7 +400,7 @@ async function createThread(interaction, name) {
         return null;
     return channel.threads.create({
         name,
-        autoArchiveDuration: 1440
+        autoArchiveDuration: 10080
     });
 }
 /**
