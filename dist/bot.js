@@ -80,47 +80,95 @@ client.once('ready', async () => {
     await (0, blockchain_1.initChain)(SUBSTRATE_ENDPOINT || '', SEED_PHRASE || '');
     await (0, blockchain_1.initDrive)();
     await checkActiveThreads();
+    // Start periodic request if it is time to lock an open thread 
+    startDeadlineChecker();
 });
+// Periodically (once per day) check of active threads deadlines
+function startDeadlineChecker() {
+    // Every 60 min (for testing). 7 days - in prod
+    setInterval(async () => {
+        try {
+            await checkActiveThreads();
+        }
+        catch (err) {
+            console.error('Error in checkActiveThreads:', err);
+        }
+    }, 60 * 60 * 1000);
+}
 /**
- * Check all active threads in all guilds.
- * For each thread that is a proposal or voting thread and is expired,
- * the bot sends a final message, stores results on Auto-drive, posts the CID,
- * marks the thread as finalized, and locks the thread.
+ * Checks all active threads in all guilds, finalizes any expired voting threads,
+ * and stores the actual final votes if possible.
  */
 async function checkActiveThreads() {
+    // Fetch all guilds where the bot is present
     const guilds = client.guilds.cache;
     for (const [_, guild] of guilds) {
         if (!guild)
             continue;
+        // Fetch all guild members (may be needed for counting, etc.)
         await guild.members.fetch();
+        // Retrieve all channels in this guild
         const channels = await guild.channels.fetch();
         for (const [, chData] of channels) {
             if (!chData)
                 continue;
+            // We only care about TextChannels where threads can exist
             if (chData.type === discord_js_1.ChannelType.GuildText) {
                 const textCh = chData;
+                // Fetch all currently active threads in this text channel
                 const activeThreads = await textCh.threads.fetchActive();
+                // For each active thread, check if it is a voting or proposal thread
                 activeThreads.threads.forEach(async (thread) => {
-                    // Process only threads with prefix "P:" or "V:" (proposal or voting threads)
+                    // We only process threads whose names start with "P:" or "V:"
                     if (!thread.name.startsWith('P:') && !thread.name.startsWith('V:'))
                         return;
+                    // Ignore if thread is already locked, archived, or previously finalized
                     if (thread.locked || thread.archived || (0, utils_1.isThreadFinalized)(thread.id))
                         return;
+                    // If this thread has expired (past its deadline), we finalize
                     if ((0, utils_1.isExpiredThread)(thread, VOTING_DURATION_HOURS)) {
-                        // Send final message and store results on Auto-drive
+                        // If the bot was offline, mention the downtime
+                        if (offlineSince) {
+                            const nowStr = new Date().toISOString();
+                            await thread.send(`The bot was offline from ${offlineSince} to ${nowStr}. Finalizing voting now.`);
+                        }
+                        // Notify about completing the voting and lock the thread
                         await thread.send("Voting completed. Thread has been successfully locked.");
+                        // 1) Find the progress message and parse the final tally
+                        const pm = await findProgressMessage(thread);
+                        let forCount = 0, againstCount = 0, abstainCount = 0;
+                        if (pm) {
+                            const lines = pm.content.split('\n');
+                            for (const line of lines) {
+                                // Look for the line that starts with "Voting progress:"
+                                if (line.startsWith('Voting progress:')) {
+                                    // Remove the prefix and pipe characters, then split by double spaces
+                                    const raw = line.replace('Voting progress:', '').replace(/\|/g, '').trim();
+                                    const parts = raw.split('  ');
+                                    if (parts.length >= 3) {
+                                        forCount = parseInt(parts[0].replace('FOR:', '').trim()) || 0;
+                                        againstCount = parseInt(parts[1].replace('AGAINST:', '').trim()) || 0;
+                                        abstainCount = parseInt(parts[2].replace('ABSTAIN:', '').trim()) || 0;
+                                    }
+                                }
+                            }
+                        }
+                        // 2) Form a vote string from the parsed values
+                        const votesStr = `FOR: ${forCount}, AGAINST: ${againstCount}, ABSTAIN: ${abstainCount}`;
+                        // Store the final results on-chain, marking the deadline as missed
                         const cid = await (0, blockchain_1.storeVotingResultsOnChain)({
                             votingThreadId: thread.id,
                             dateOfCreating: (thread.createdAt ?? new Date()).toISOString(),
                             fullThreadName: thread.name,
                             eligibleCount: getRoleMembers(guild).size,
                             allEligibleMembers: Array.from(getRoleMembers(guild).values()).map(m => `${m.user.tag} (${m.id})`),
-                            votes: 'unknown final votes (not parsed here)',
+                            votes: votesStr,
                             missedDeadline: true,
                             votingFinished: true
                         });
-                        // Post a message with the CID in the thread
+                        // Notify the thread with the CID, so users can retrieve results via /results
                         await thread.send(`Voting results have been uploaded to Auto-drive. CID: ${cid}`);
+                        // Mark thread as finalized, then lock/archive it
                         (0, utils_1.markThreadFinalized)(thread.id);
                         await (0, utils_1.lockThread)(thread);
                     }
@@ -136,7 +184,7 @@ client.on('interactionCreate', async (interaction) => {
     const { commandName } = interaction;
     const guild = interaction.guild;
     if (!guild) {
-        await interaction.reply({ content: 'No guild.', ephemeral: true });
+        await interaction.reply({ content: 'No guild.', flags: 64 });
         return;
     }
     if (commandName === 'discussion') {
@@ -145,10 +193,10 @@ client.on('interactionCreate', async (interaction) => {
         const name = `D:${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({ content: 'Error while creating thread.', ephemeral: true });
+            await interaction.reply({ content: 'Error while creating thread.', flags: 64 });
             return;
         }
-        await interaction.reply({ content: `Discussion thread created: ${thr.name}`, ephemeral: true });
+        await interaction.reply({ content: `Discussion thread created: ${thr.name}`, flags: 64 });
     }
     if (commandName === 'proposal') {
         // Create a proposal thread with expiration.
@@ -158,11 +206,11 @@ client.on('interactionCreate', async (interaction) => {
         const name = `P:${expStr}: ${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({ content: 'Error while creating proposal thread.', ephemeral: true });
+            await interaction.reply({ content: 'Error while creating proposal thread.', flags: 64 });
             return;
         }
         await thr.send(`Ping: <@&${ROLE_ID}>`);
-        await interaction.reply({ content: `Proposal thread created: ${thr.name}`, ephemeral: true });
+        await interaction.reply({ content: `Proposal thread created: ${thr.name}`, flags: 64 });
     }
     if (commandName === 'vote') {
         // Create a voting thread with expiration.
@@ -172,7 +220,7 @@ client.on('interactionCreate', async (interaction) => {
         const name = `V:${expStr}: ${subject}`;
         const thr = await createThread(interaction, name);
         if (!thr) {
-            await interaction.reply({ content: 'Error while creating voting thread.', ephemeral: true });
+            await interaction.reply({ content: 'Error while creating voting thread.', flags: 64 });
             return;
         }
         // Create voting interface buttons
@@ -189,17 +237,17 @@ client.on('interactionCreate', async (interaction) => {
         // Send initial progress message with spoiler formatting
         const content2 = `Voting progress: ||FOR: 0 | AGAINST: 0 | ABSTAIN: 0||\nVoting tokens left: ${tokens.join(', ')}`;
         await thr.send(content2);
-        await interaction.reply({ content: `Voting thread created: ${thr.name}`, ephemeral: true });
+        await interaction.reply({ content: `Voting thread created: ${thr.name}`, flags: 64 });
     }
     if (commandName === 'myvotetoken') {
         // Return the vote token for the user in the current thread.
         const thr = interaction.channel;
         if (!thr || thr.type !== discord_js_1.ChannelType.PublicThread) {
-            await interaction.reply({ content: 'This command only works in a thread.', ephemeral: true });
+            await interaction.reply({ content: 'This command only works in a thread.', flags: 64 });
             return;
         }
         const vt = (0, utils_1.generateVoteToken)(interaction.user.id, thr.id, VOTERID_SECRET || '');
-        await interaction.reply({ content: `Your VoteToken: ${vt}`, ephemeral: true });
+        await interaction.reply({ content: `Your VoteToken: ${vt}`, flags: 64 });
     }
     if (commandName === 'results') {
         // Step1: checking if the channel is not an archived thread
@@ -209,7 +257,7 @@ client.on('interactionCreate', async (interaction) => {
             try {
                 await interaction.reply({
                     content: 'This is archived thread. Please run `/results` from a non-archived channel!',
-                    ephemeral: true
+                    flags: 64
                 });
             }
             catch (err) {
@@ -219,7 +267,7 @@ client.on('interactionCreate', async (interaction) => {
         }
         // Step 2: This is not archived thread!
         // Defer the command so Discord knows we're working on a reply 
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply({});
         try {
             // This command is invoked from a channel.
             // It looks for the CID in the thread messages and retrieves final results from Auto-drive.
@@ -284,7 +332,7 @@ client.on('interactionCreate', async (interaction) => {
     /myVoteToken
     /results <threadName|threadID> (Do not run from threads)
     /help`;
-        await interaction.reply({ content: msg, ephemeral: true });
+        await interaction.reply({ content: msg, flags: 64 });
     }
 });
 // Button interaction handler: processes vote button clicks.
@@ -305,7 +353,7 @@ client.on('interactionCreate', async (interaction) => {
     // Get the progress message that holds current vote counts and remaining tokens.
     const pm = await findProgressMessage(thread);
     if (!pm) {
-        await buttonInteraction.reply({ content: 'No voting data found in this thread.', ephemeral: true });
+        await buttonInteraction.reply({ content: 'No voting data found in this thread.', flags: 64 });
         return;
     }
     // Parse the progress message to extract current counts and tokens left.
@@ -332,7 +380,7 @@ client.on('interactionCreate', async (interaction) => {
     // Generate a vote token for the user.
     const token = (0, utils_1.generateVoteToken)(buttonInteraction.user.id, thread.id, VOTERID_SECRET || '');
     if (!tokensLeft.includes(token)) {
-        await buttonInteraction.reply({ content: 'You are either not eligible or have already used your token!', ephemeral: true });
+        await buttonInteraction.reply({ content: 'You are either not eligible or have already used your token!', flags: 64 });
         return;
     }
     // Update vote counts based on the button pressed.
@@ -357,7 +405,7 @@ client.on('interactionCreate', async (interaction) => {
     await pm.edit({ content: newContent });
     if (finished) {
         // If this vote completes the voting session, record final results.
-        await buttonInteraction.reply({ content: `Your vote is recorded. This was the final vote.`, ephemeral: true });
+        await buttonInteraction.reply({ content: `Your vote is recorded. This was the final vote.`, flags: 64 });
         if (!(0, utils_1.isThreadFinalized)(thread.id)) {
             try {
                 if (guild) {
@@ -384,12 +432,12 @@ client.on('interactionCreate', async (interaction) => {
             }
             (0, utils_1.markThreadFinalized)(thread.id);
         }
-        await thread.send('Use `/results <ThreadID>` command to view  voting results (not inside threads!).');
+        await thread.send('Use `/results <ThreadID>` command to view results (not inside threads!).');
         await (0, utils_1.lockThread)(thread);
         return;
     }
     else {
-        await buttonInteraction.reply({ content: `Your vote is recorded. Token: ${token}`, ephemeral: true });
+        await buttonInteraction.reply({ content: `Your vote is recorded. Token: ${token}`, flags: 64 });
     }
 });
 // Handler for thread updates to enforce thread naming and locking policies.
