@@ -19,7 +19,7 @@ async def create_thread(interaction: discord.Interaction, name: str, content: st
 
     thread = await message.create_thread(
         name=name,
-        auto_archive_duration=60  # Change this to team desicison, currently 60 minutes
+        auto_archive_duration=86400 * cfg['proposal_thread_open_windows']  # Change this to team decision, currently 60 minutes
     )
     role = discord.utils.get(interaction.guild.roles, name=cfg['governance_role'])
 
