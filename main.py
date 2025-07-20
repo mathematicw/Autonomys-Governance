@@ -6,7 +6,7 @@ from commands.utils.config import load_config
 from commands.help import helper_wrapper
 from commands.proposal import proposal_wrapper
 from commands.utils.sql import run_init_sql
-from commands.vote import vote_request, close_vote_command, vote_recall
+from commands.vote import vote_wrapper
 
 run_init_sql()
 
@@ -44,7 +44,5 @@ if __name__ == '__main__':
 
     helper_wrapper(client)
     proposal_wrapper(client)
-    vote_request(client)
-    close_vote_command(client)
-    vote_recall(client)
+    vote_wrapper(client)
     client.run(cfg["token"])
