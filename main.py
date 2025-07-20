@@ -6,6 +6,7 @@ from commands.utils.config import load_config
 from commands.help import helper_wrapper
 from commands.proposal import proposal_wrapper
 from commands.utils.sql import run_init_sql
+from commands.vote import vote_request, close_vote_command, vote_recall
 
 run_init_sql()
 
@@ -38,8 +39,12 @@ async def on_ready():
 if __name__ == '__main__':
     _intents = discord.Intents.default()
     _intents.guilds = True
+    _intents.members = True
     client = MyClient(intents=_intents)
 
     helper_wrapper(client)
     proposal_wrapper(client)
+    vote_request(client)
+    close_vote_command(client)
+    vote_recall(client)
     client.run(cfg["token"])
