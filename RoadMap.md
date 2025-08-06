@@ -1,4 +1,4 @@
-###1.Project Overview
+### 1.Project Overview
 
 **Application Name:**
 Autonomys Governance Bot
@@ -11,9 +11,8 @@ The bot eliminates manual labor and human error in the voting process within Dis
 It solves instability and vulnerability inherent in manual processes, such as forgetting formats or rules, roles changing, lack of tagging problems.
 We gain the flexibility to adapt quickly to changes in policy or mechanics (e.g. voting deadlines, roles) by adjusting variables within the bot.
 
----
 
-###2.Current Status
+### 2.Current Status
 
  ✔️ Support for slash commands necessary for creating discussions, proposals, votes, token issuance, and result queries;
  ✔️ Automated thread formatting and deadline enforcement;
@@ -25,7 +24,7 @@ We gain the flexibility to adapt quickly to changes in policy or mechanics (e.g.
  ✔️ Uploading voting results to Auto-drive;
  ✔️ Retrieving voting results.
 
-***Key Open Tasks and Issues Required Further Work:**
+**Key Open Tasks and Issues Required Further Work:**
 
 * 📌 **Unified Data Source (Registry):**
   Currently participant rights are managed via `.env` file. We aim to replace this with a robust on-chain registry as the authoritative source of rights and other parameters for voting eligibility. This registry currently exists as a Google Sheet containing ambassadors Discord handles, IDs, emails, statuses, status changes dates, primary/secondary team assignments, etc. Our goal is to fully migrate this to the blockchain for transparency, immutability, and up-to-date data.
@@ -51,9 +50,7 @@ We gain the flexibility to adapt quickly to changes in policy or mechanics (e.g.
 * 📌 **Interface Enhancements:**
   The Discord interface can still be improved.
 
----
-
-###3.Project Goals
+### 3.Project Goals
 
 To build a fully adaptive, resilient Discord voting bot integrated with Autonomys infrastructure. The bot should deliver:
 
